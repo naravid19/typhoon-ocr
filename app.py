@@ -68,6 +68,13 @@ def process_pdf(pdf_or_image_file, task_type):
     response = openai.chat.completions.create(
         model="typhoon-ocr",
         messages=messages,
+        max_tokens=16384,
+        extra_body={
+            "repetition_penalty": 1.2,
+            "temperature": 0.1,
+            "top_p": 0.6,
+        },
+        
     )
     text_output = response.choices[0].message.content
     
