@@ -17,16 +17,19 @@ pip install -r requirements.txt
 ### Mac specific
 ```
 brew install poppler
+# The following binaries are required and provided by poppler:
+# - pdfinfo
+# - pdftoppm
 ```
 ### Linux specific
 ```
 sudo apt-get update
 sudo apt-get install poppler-utils
-```
-
 # The following binaries are required and provided by poppler-utils:
 # - pdfinfo
 # - pdftoppm
+```
+
 
 ### Start vllm
 ```bash
