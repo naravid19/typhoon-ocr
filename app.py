@@ -93,7 +93,7 @@ with gr.Blocks(theme=theme) as demo:
     title = gr.HTML("""
     <h1>Typhoon OCR</h1>
     <ul>
-        <li>🤗 <b>Model weights</b>: <a href="scb10x/typhoon-ocr-7b" target="_blank">scb10x/typhoon-ocr-7b</a></li>
+        <li>🤗 <b>Model weights</b>: <a href="https://huggingface.co/scb10x/typhoon-ocr-7b" target="_blank">https://huggingface.co/scb10x/typhoon-ocr-7b</a></li>
     </ul>
     <br />
     <details>
