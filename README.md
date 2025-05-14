@@ -12,6 +12,7 @@ Typhoon OCR is a simple Gradio web app for extracting structured markdown from P
 ```bash
 pip install -r requirements.txt
 # edit .env
+# pip install vllm # optional for hosting a local server
 ```
 
 ### Mac specific
@@ -47,7 +48,7 @@ python app.py
 - ftfy
 - pypdf
 - gradio
-- vllm
+- vllm (for hosting an inference server)
 - pillow
 
 ### License

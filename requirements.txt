@@ -3,5 +3,4 @@ python-dotenv
 ftfy
 pypdf
 gradio
-vllm
 pillow
