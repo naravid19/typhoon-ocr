@@ -66,7 +66,7 @@ def process_pdf(pdf_or_image_file, task_type):
     }]
     # send messages to openai compatible api
     response = openai.chat.completions.create(
-        model="typhoon-ocr",
+        model=os.getenv("TYPHOON_OCR_MODEL"),
         messages=messages,
         max_tokens=16384,
         extra_body={
