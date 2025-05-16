@@ -1,12 +1,14 @@
 ## Typhoon OCR
 
-Typhoon OCR is a simple Gradio web app for extracting structured markdown from PDFs or images using an OpenAI-compatible vision-language model. It supports document layout analysis and table extraction, returning results in markdown or HTML.
+Typhoon OCR is a model for extracting structured markdown from images or PDFs. It supports document layout analysis and table extraction, returning results in markdown or HTML. This package is a simple Gradio website to demonstrate the performance of Typhoon OCR.
+
 
 ### Features
 - Upload a PDF or image (single page)
 - Extracts and reconstructs document content as markdown
 - Supports different prompt modes for layout or structure
-- Uses a local or remote OpenAI-compatible API (e.g., vllm)
+- Language: English, Thai
+- Uses a local or remote OpenAI-compatible API (e.g., vllm, opentyphoon.ai)
 
 ### Install
 ```bash
