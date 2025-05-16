@@ -5,13 +5,13 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="typhoon-ocr",
-    version="0.3.0",
+    version="0.3.4",
     author="Typhoon OCR Contributors",
-    author_email="your.email@example.com",
-    description="A package for extracting structured content from PDFs and images",
+    author_email="contact@opentyphoon.ai",
+    description="A package for extracting structured content from PDFs and images using Typhoon OCR models",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/yourusername/typhoon-ocr",
+    url="https://github.com/scb-10x/typhoon-ocr",
     packages=find_packages(),
     classifiers=[
         "Programming Language :: Python :: 3",
@@ -23,6 +23,7 @@ setup(
         "ftfy",
         "pypdf",
         "pillow",
+        "openai",
     ],
     extras_require={
         "dev": [
@@ -32,7 +33,6 @@ setup(
         ],
         "app": [
             "gradio",
-            "openai",
             "python-dotenv",
         ],
     },

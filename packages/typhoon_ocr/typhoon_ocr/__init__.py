@@ -25,4 +25,4 @@ from .ocr_utils import (
     image_to_pdf
 )
 
-__version__ = "0.3.0" 
+__version__ = "0.3.4" 

@@ -3,6 +3,7 @@ Utility functions for Typhoon OCR.
 
 This code is adapted from https://github.com/allenai/olmocr
 Under the Apache 2.0 license.
+Edited by Typhoon OCR Contributors.
 """
 from dataclasses import dataclass
 import os
