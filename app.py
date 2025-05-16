@@ -2,10 +2,9 @@ import base64
 from io import BytesIO
 import json
 import os
-from meta_prompt import get_prompt
 from openai import OpenAI
 from dotenv import load_dotenv
-from utils import render_pdf_to_base64png, image_to_pdf, get_anchor_text
+from typhoon_ocr import prepare_ocr_messages
 import gradio as gr
 from PIL import Image
 
@@ -31,61 +30,51 @@ theme = gr.themes.Soft(
     neutral_hue="stone",
 )
 
-def process_pdf(pdf_or_image_file, task_type):
+def process_pdf(pdf_or_image_file, task_type, page_number):
     if pdf_or_image_file is None:
         return None, "No file uploaded"
     
     orig_filename = pdf_or_image_file.name
-    ext = os.path.splitext(orig_filename)[1].lower()
-    filename = orig_filename  # default to original file if PDF
     
-    # If the file is not a PDF, assume it's an image and convert it to PDF.
-    if ext not in [".pdf"]:
-        filename = image_to_pdf(orig_filename)
-        if filename is None:
-            return None, "Error converting image to PDF"
-    
-    # Render the first page to base64 PNG and then load it into a PIL image.
-    image_base64 = render_pdf_to_base64png(filename, 1, target_longest_image_dim=1800)
-    image_pil = Image.open(BytesIO(base64.b64decode(image_base64)))
-    
-    # Extract anchor text from the PDF (first page)
-    anchor_text = get_anchor_text(filename, 1, pdf_engine="pdfreport", target_length=8000)
-    
-    # Retrieve and fill in the prompt template with the anchor_text
-    prompt_template_fn = get_prompt(task_type)
-    PROMPT = prompt_template_fn(anchor_text)
-    
-    # Create a messages structure including text and image URL
-    messages = [{
-        "role": "user",
-        "content": [
-            {"type": "text", "text": PROMPT},
-            {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{image_base64}"}},
-        ],
-    }]
-    # send messages to openai compatible api
-    response = openai.chat.completions.create(
-        model=os.getenv("TYPHOON_OCR_MODEL"),
-        messages=messages,
-        max_tokens=16384,
-        extra_body={
-            "repetition_penalty": 1.2,
-            "temperature": 0.1,
-            "top_p": 0.6,
-        },
-        
-    )
-    text_output = response.choices[0].message.content
-    
-    # Try to parse the output assuming it is a Python dictionary containing 'natural_text'
     try:
-        json_data = json.loads(text_output)
-        markdown_out = json_data.get('natural_text', "").replace("<figure>", "").replace("</figure>", "")
-    except Exception as e:
-        markdown_out = f"⚠️ Could not extract `natural_text` from output.\nError: {str(e)}"
+        # Use the new simplified function to prepare OCR messages with page number
+        messages = prepare_ocr_messages(
+            pdf_or_image_path=orig_filename,
+            task_type=task_type,
+            target_image_dim=1800,
+            target_text_length=8000,
+            page_num=page_number if page_number else 1
+        )
+        
+        # Extract the image from the message content for display
+        image_url = messages[0]["content"][1]["image_url"]["url"]
+        image_base64 = image_url.replace("data:image/png;base64,", "")
+        image_pil = Image.open(BytesIO(base64.b64decode(image_base64)))
+        
+        # Send messages to OpenAI compatible API
+        response = openai.chat.completions.create(
+            model=os.getenv("TYPHOON_OCR_MODEL"),
+            messages=messages,
+            max_tokens=16384,
+            extra_body={
+                "repetition_penalty": 1.2,
+                "temperature": 0.1,
+                "top_p": 0.6,
+            },
+        )
+        text_output = response.choices[0].message.content
+        
+        # Try to parse the output assuming it is a Python dictionary containing 'natural_text'
+        try:
+            json_data = json.loads(text_output)
+            markdown_out = json_data.get('natural_text', "").replace("<figure>", "").replace("</figure>", "")
+        except Exception as e:
+            markdown_out = f"⚠️ Could not extract `natural_text` from output.\nError: {str(e)}"
+        
+        return image_pil, markdown_out
     
-    return image_pil, markdown_out
+    except Exception as e:
+        return None, f"Error processing file: {str(e)}"
 
 
 # Build the Gradio UI.
@@ -114,10 +103,11 @@ with gr.Blocks(theme=theme) as demo:
     with gr.Row():
         with gr.Column(scale=1):
             # Update file_types to accept PDF as well as common image formats.
-            pdf_input = gr.File(label="📄 Upload PDF (Only first page will be processed)", file_types=[".pdf", ".png", ".jpg", ".jpeg"])
+            pdf_input = gr.File(label="📄 Upload Image file or PDF file", file_types=[".pdf", ".png", ".jpg", ".jpeg"])
             task_dropdown = gr.Dropdown(["default", "structure"], label="🎯 Select Task", value="default")
+            page_number = gr.Number(label="📄 Page Number (for PDFs only)", value=1, minimum=1, step=1)
             run_button = gr.Button("🚀 Run")
-            image_output = gr.Image(label="📸 Preview Image (Page 1)", type="pil")
+            image_output = gr.Image(label="📸 Preview Image", type="pil")
         with gr.Column(scale=2):
             markdown_output = gr.Markdown(label='Markdown Result', show_label=True)
 
@@ -125,7 +115,7 @@ with gr.Blocks(theme=theme) as demo:
     # Connect the UI inputs to the processing function.
     run_button.click(
         fn=process_pdf,
-        inputs=[pdf_input, task_dropdown],
+        inputs=[pdf_input, task_dropdown, page_number],
         outputs=[image_output, markdown_output]
     )
 
