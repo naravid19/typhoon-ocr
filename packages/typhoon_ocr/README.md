@@ -45,46 +45,46 @@ The following binaries are required:
 
 ### Core functionality
 
-The package provides three main functions:
+The package provides 2 main functions:
 
 ```python
-from typhoon_ocr import prepare_ocr_messages, get_prompt, image_to_pdf
+from typhoon_ocr import ocr_document, prepare_ocr_messages
 ```
+* `ocr_document`: Full OCR pipeline for Typhoon OCR model via opentyphoon.ai or OpenAI compatible api (such as vllm)
+* `prepare_ocr_messages`: Generate complete OCR-ready messages for the Typhoon OCR model
 
-* `prepare_ocr_messages`: Main function to generate complete OCR-ready messages for the Typhoon OCR model
-* `get_prompt`: Access built-in prompt templates for different tasks
-* `image_to_pdf`: Convert image files to PDF format
-
-### Basic image/PDF processing
-
-Convert an image to PDF format:
-
-```python
-from typhoon_ocr import image_to_pdf
-
-# Convert an image to PDF
-pdf_path = image_to_pdf('document.jpg')
-```
 
 ### Complete OCR workflow
 
-Use the simplified API to prepare messages for OCR processing in a single function call:
+Use the simplified API to ocr the document or prepare messages for OpenAI compatible api at opentyphoon.ai:
 
 ```python
-from typhoon_ocr import prepare_ocr_messages
-from openai import OpenAI
+from typhoon_ocr import ocr_document
 
-# Prepare messages for OCR processing with just one function call
-messages = prepare_ocr_messages(
+markdown = ocr_document(
     pdf_or_image_path="document.pdf",  # Works with PDFs or images
     task_type="default",    # Choose between "default" or "structure"
     page_num=2              # Process page 2 of a PDF (default is 1, always 1 for images)
 )
 
 # Or with image
-messages = prepare_ocr_messages(
+markdown = ocr_document(
     pdf_or_image_path="scan.jpg",  # Works with PDFs or images
     task_type="default",    # Choose between "default" or "structure"
+)
+```
+
+Prepare the messages manually.
+
+```python
+from typhoon_ocr import prepare_ocr_messages
+from openai import OpenAI
+
+# Prepare messages for OCR processing
+messages = prepare_ocr_messages(
+    pdf_or_image_path="document.pdf",  # Works with PDFs or images
+    task_type="default",    # Choose between "default" or "structure"
+    page_num=2              # Process page 2 of a PDF (default is 1, always 1 for images)
 )
 
 # Use with https://opentyphoon.ai/ api or self-host model via vllm
@@ -108,21 +108,6 @@ markdown = json.loads(text_output)['natural_text']
 print(markdown)
 ```
 
-### Custom prompt templates
-
-Access and use the built-in prompt templates:
-
-```python
-from typhoon_ocr import get_prompt
-
-# Get the default prompt template function
-default_prompt_fn = get_prompt("default")
-
-# Apply it to some text
-prompt_text = default_prompt_fn("Your extracted text here")
-print(prompt_text)
-```
-
 ### Available task types
 
 The package comes with built-in prompt templates for different OCR tasks:
@@ -142,7 +127,7 @@ The Typhoon OCR model, when used with this package, can extract:
 
 ## License
 
-This project is licensed under the Apache 2.0 License. See individual datasets and checkpoints for their respective licenses.
+This project code is licensed under the Apache 2.0 License.
 
 ## Acknowledgments
 

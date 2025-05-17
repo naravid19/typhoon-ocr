@@ -6,6 +6,8 @@ Under the Apache 2.0 license.
 Edited by Typhoon OCR Contributors.
 """
 from dataclasses import dataclass
+import json
+from openai import OpenAI
 import os
 import re
 import tempfile
@@ -512,4 +514,35 @@ def prepare_ocr_messages(
     except IndexError:
         raise ValueError(f"Page number {page_num} is out of range for the document {pdf_or_image_path}")
     except Exception as e:
-        raise ValueError(f"Error processing document: {str(e)}") 
+        raise ValueError(f"Error processing document: {str(e)}")
+    
+
+def ocr_document(pdf_or_image_path: str, task_type: str = "default", target_image_dim: int = 1800, target_text_length: int = 8000, page_num: int = 1, base_url: str = 'https://api.opentyphoon.ai/v1', api_key: str = None, model: str = "typhoon-ocr-preview") -> str:
+    """
+    OCR a PDF or image file.
+    
+    This function provides an end-to-end workflow that combines multiple processing steps
+    into a single call, creating messages ready for OCR processing with language models.
+    It handles both image and PDF inputs, with appropriate page selection for PDFs.
+    """
+    openai = OpenAI(base_url=base_url, api_key=api_key or os.getenv("TYPHOON_OCR_API_KEY") or os.getenv("OPENAI_API_KEY"))
+    messages = prepare_ocr_messages(
+        pdf_or_image_path=pdf_or_image_path,
+        task_type=task_type,
+        target_image_dim=target_image_dim,
+        target_text_length=target_text_length,
+        page_num=page_num if page_num else 1
+    )
+    response = openai.chat.completions.create(
+        model=model,
+        messages=messages,
+        max_tokens=16384,
+        extra_body={
+            "repetition_penalty": 1.2,
+            "temperature": 0.1,
+            "top_p": 0.6,
+        },
+    )
+    text_output = response.choices[0].message.content
+    text = json.loads(text_output)['natural_text']
+    return text
