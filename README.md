@@ -9,10 +9,17 @@ Typhoon OCR is a model for extracting structured markdown from images or PDFs. I
 - Supports different prompt modes for layout or structure
 - Language: English, Thai
 - Uses a local or remote OpenAI-compatible API (e.g., vllm, opentyphoon.ai)
+- See blog for more detail https://opentyphoon.ai/blog/en/typhoon-ocr-release
+
+### Requirements
+
+- Linux / Mac with python (window not supported at the moment)
+
 
 ### Install
 ```bash
-pip install -r requirements.txt
+pip install -r requirements.txt 
+# or pip install typhoon-ocr for minimal installation
 # edit .env
 # pip install vllm # optional for hosting a local server
 ```
@@ -52,6 +59,9 @@ python app.py
 - gradio
 - vllm (for hosting an inference server)
 - pillow
+
+### Debug
+- If `Error processing document` occur. Make sure you have install `brew install poppler` or `apt-get install poppler-utils`.
 
 ### License
 This project is licensed under the Apache 2.0 License. See individual datasets and checkpoints for their respective licenses.

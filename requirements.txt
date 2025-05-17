@@ -4,3 +4,4 @@ ftfy
 pypdf
 gradio
 pillow
+typhoon-ocr
