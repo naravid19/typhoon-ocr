@@ -22,8 +22,9 @@ Example Usage:
 from .ocr_utils import (
     prepare_ocr_messages,
     get_prompt,
+    get_anchor_text,
     image_to_pdf,
-    ocr_document
+    ocr_document,
 )
 
-__version__ = "0.3.5" 
+__version__ = "0.3.6" 
