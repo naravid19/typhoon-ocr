@@ -18,7 +18,7 @@ Example Usage:
     >>> messages = prepare_ocr_messages("document.pdf", task_type="default", page_num=1)
     >>> # Use messages with LLM API for OCR processing
 """
-
+from .pdf_utils import pdf_utils_available
 from .ocr_utils import (
     prepare_ocr_messages,
     get_prompt,
@@ -27,4 +27,14 @@ from .ocr_utils import (
     ocr_document,
 )
 
-__version__ = "0.3.6" 
+__version__ = "0.3.7"
+
+# Export the check_dependencies function as part of the public API
+__all__ = [
+    "pdf_utils_available",
+    "prepare_ocr_messages",
+    "get_prompt",
+    "get_anchor_text", 
+    "image_to_pdf",
+    "ocr_document",
+] 
