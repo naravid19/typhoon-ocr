@@ -20,9 +20,7 @@ import random
 import ftfy
 from pypdf.generic import RectangleObject
 from pypdf import PdfReader
-from dotenv import load_dotenv
 
-load_dotenv()
 
 @dataclass(frozen=True)
 class Element:
