@@ -10,6 +10,7 @@ import json
 from openai import OpenAI
 import os
 import re
+import io
 import tempfile
 from PIL import Image
 import subprocess
@@ -19,6 +20,7 @@ import random
 import ftfy
 from pypdf.generic import RectangleObject
 from pypdf import PdfReader
+
 
 @dataclass(frozen=True)
 class Element:
@@ -515,7 +517,37 @@ def prepare_ocr_messages(
         raise ValueError(f"Page number {page_num} is out of range for the document {pdf_or_image_path}")
     except Exception as e:
         raise ValueError(f"Error processing document: {str(e)}")
-    
+
+def is_base64_string(input_string: str) -> bool:
+    try:
+        # Try to decode and re-encode to check validity
+        return base64.b64encode(base64.b64decode(input_string))[:10] == input_string.encode()[:10]
+    except Exception:
+        return False
+
+def detect_input_type(input_string: str) -> str:
+    """
+    Detect whether the input is a base64-encoded image or a file path.
+
+    - If it's base64, decode and save it as a temporary image file.
+    - If it's a valid image format (e.g. JPEG, PNG), preserve the format.
+    - If it's not base64, return the input as-is (assumed to be a path).
+
+    Returns:
+        str: A file path (either the original or a temp file path if base64).
+    """
+    if is_base64_string(input_string):
+        try:
+            image_data = base64.b64decode(input_string)
+            image = Image.open(io.BytesIO(image_data))
+            image_format = image.format.lower()  # e.g. 'jpeg', 'png'
+            # Save image to a temporary file with correct extension
+            temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=f".{image_format}")
+            image.save(temp_file.name, format=image_format)
+            return temp_file.name
+        except Exception:
+            return input_string
+    return input_string
 
 def ocr_document(pdf_or_image_path: str, task_type: str = "default", target_image_dim: int = 1800, target_text_length: int = 8000, page_num: int = 1, base_url: str = 'https://api.opentyphoon.ai/v1', api_key: str = None, model: str = "typhoon-ocr-preview") -> str:
     """
@@ -525,6 +557,7 @@ def ocr_document(pdf_or_image_path: str, task_type: str = "default", target_imag
     into a single call, creating messages ready for OCR processing with language models.
     It handles both image and PDF inputs, with appropriate page selection for PDFs.
     """
+    pdf_or_image_path = detect_input_type(pdf_or_image_path)
     openai = OpenAI(base_url=base_url, api_key=api_key or os.getenv("TYPHOON_OCR_API_KEY") or os.getenv("OPENAI_API_KEY"))
     messages = prepare_ocr_messages(
         pdf_or_image_path=pdf_or_image_path,
