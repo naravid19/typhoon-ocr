@@ -422,6 +422,18 @@ def get_prompt(prompt_name: str) -> Callable[[str], str]:
     """
     return PROMPTS_SYS.get(prompt_name, lambda x: "Invalid PROMPT_NAME provided.")
 
+def image_to_base64png(img: Image.Image):
+    buffered = io.BytesIO()
+    img = img.convert("RGB")
+    img.save(buffered, format="JPEG")
+    return base64.b64encode(buffered.getvalue()).decode("utf-8")
+
+def get_anchor_text_from_image(img: Image.Image):
+    width = float(img.width)
+    height = float(img.height)
+    text = f"""Page dimensions: {width:.1f}x{height:.1f}\n[Image 0x0 to {width:.0f}x{height:.0f}]\n"""
+    return text
+
 def prepare_ocr_messages(
     pdf_or_image_path: str, 
     task_type: str = "default", 
@@ -479,25 +491,31 @@ def prepare_ocr_messages(
     # Determine if the file is a PDF or image
     filename = pdf_or_image_path
     
-    # If the file is not a PDF, convert it and ensure page_num is 1
-    if is_image:
-        filename = image_to_pdf(pdf_or_image_path)
-        if filename is None:
-            raise ValueError(f"Error converting image to PDF: {pdf_or_image_path}")
-        # Images always use page 1
-        page_num = 1
-    elif page_num < 1:
-        # Ensure page_num is at least 1 for PDFs
-        page_num = 1
-    else:
-        page_num = int(page_num) # cast to int
-    
     try:
-        # Render the selected page to base64 PNG
-        image_base64 = render_pdf_to_base64png(filename, page_num, target_longest_image_dim=target_image_dim)
+        if is_image:
+            page_num = 1
+            img = Image.open(pdf_or_image_path)
+            # Render the image to base64 PNG
+            image_base64 = image_to_base64png(img)
+            # Get anchor text from the image
+            anchor_text = get_anchor_text_from_image(img)
+        else:
+            if page_num < 1:
+                page_num = 1
+            else:
+                page_num = int(page_num)  # cast to int
+            # Render the selected page to base64 PNG
+            image_base64 = render_pdf_to_base64png(
+                filename, page_num, target_longest_image_dim=target_image_dim
+            )
+            # Extract anchor text from the selected PDF page
+            anchor_text = get_anchor_text(
+                filename,
+                page_num,
+                pdf_engine="pdfreport",
+                target_length=target_text_length,
+            )
         
-        # Extract anchor text from the selected PDF page
-        anchor_text = get_anchor_text(filename, page_num, pdf_engine="pdfreport", target_length=target_text_length)
         
         # Get the prompt template function for the specified task type
         prompt_fn = get_prompt(task_type)
@@ -529,7 +547,7 @@ def is_base64_string(input_string: str) -> bool:
     except Exception:
         return False
 
-def detect_input_type(input_string: str) -> str:
+def ensure_image_in_path(input_string: str) -> str:
     """
     Detect whether the input is a base64-encoded image or a file path.
 
@@ -540,7 +558,9 @@ def detect_input_type(input_string: str) -> str:
     Returns:
         str: A file path (either the original or a temp file path if base64).
     """
-    if is_base64_string(input_string):
+    if input_string.endswith(".png") or input_string.endswith(".jpg") or input_string.endswith(".jpeg") or input_string.endswith(".pdf"):
+        return input_string
+    elif is_base64_string(input_string):
         try:
             image_data = base64.b64decode(input_string)
             image = Image.open(io.BytesIO(image_data))
@@ -578,7 +598,7 @@ def ocr_document(pdf_or_image_path: str, task_type: str = "default", target_imag
     Raises:
         ValueError: If image conversion fails, page number is out of range, or other processing errors occur
     """
-    pdf_or_image_path = detect_input_type(pdf_or_image_path)
+    pdf_or_image_path = ensure_image_in_path(pdf_or_image_path)
     
     openai = OpenAI(base_url=base_url, api_key=api_key or os.getenv("TYPHOON_OCR_API_KEY") or os.getenv('TYPHOON_API_KEY') or os.getenv("OPENAI_API_KEY"))
     messages = prepare_ocr_messages(
