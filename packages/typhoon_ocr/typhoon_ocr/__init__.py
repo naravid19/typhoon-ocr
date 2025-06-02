@@ -27,7 +27,7 @@ from .ocr_utils import (
     ocr_document,
 )
 
-__version__ = "0.3.7"
+__version__ = "0.3.8"
 
 __all__ = [
     "pdf_utils_available",

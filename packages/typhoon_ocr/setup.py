@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="typhoon-ocr",
-    version="0.3.7",
+    version="0.3.8",
     author="Typhoon OCR Contributors",
     author_email="contact@opentyphoon.ai",
     description="A package for extracting structured content from PDFs and images using Typhoon OCR models",
