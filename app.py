@@ -108,9 +108,9 @@ with gr.Blocks(theme=theme) as demo:
             with gr.Box():
                 task_dropdown = gr.Radio(["default", "structure"], label="🎯 Select Task", value="default")
                 gr.HTML("""
-                <p><b>default</b>: for infographic and general documents</p>
-                <p><b>structure</b>: for documents with complex layout and images</p>
-                <p>We recommend using trying both and see which one works better for your use case.</p>
+                <p><b>default</b>: This mode works for most cases and is recommended for files without a clear template such as infographics.</p>
+                <p><b>structure</b>: This mode offers improved performance for structured documents such as formal documents and forms.</p>
+                <p>We recommend trying both and see which one works better for your use case.</p>
                 """, elem_classes=["task-dropdown-info"])
                 demo.css = """
                 .task-dropdown-info {
