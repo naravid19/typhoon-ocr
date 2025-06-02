@@ -29,7 +29,6 @@ from .ocr_utils import (
 
 __version__ = "0.3.7"
 
-# Export the check_dependencies function as part of the public API
 __all__ = [
     "pdf_utils_available",
     "prepare_ocr_messages",
