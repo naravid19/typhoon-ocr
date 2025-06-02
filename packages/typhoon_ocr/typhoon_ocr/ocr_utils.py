@@ -470,7 +470,6 @@ def prepare_ocr_messages(
     
     Raises:
         ValueError: If image conversion fails, page number is out of range, or other processing errors occur
-        RuntimeError: If required PDF utilities are not installed
         
     Examples:
         >>> # Process the first page of a PDF
@@ -489,15 +488,6 @@ def prepare_ocr_messages(
     # Check for required PDF utilities
     ext = os.path.splitext(pdf_or_image_path)[1].lower()
     is_image = ext not in [".pdf"]
-    
-    # Only check for PDF utilities if working with PDFs
-    if not is_image and not pdf_utils_available:
-        raise RuntimeError(
-            "PDF utilities (pdfinfo, pdftoppm) are not available. "
-            "Please install Poppler utilities to process PDF files. "
-            "Run `from typhoon_ocr import check_dependencies` "
-            "and then `check_dependencies()` for installation instructions."
-        )
     
     # Determine if the file is a PDF or image
     filename = pdf_or_image_path
@@ -600,23 +590,10 @@ def ocr_document(pdf_or_image_path: str, task_type: str = "default", target_imag
         
     Raises:
         ValueError: If image conversion fails, page number is out of range, or other processing errors occur
-        RuntimeError: If required PDF utilities are not installed
     """
     pdf_or_image_path = detect_input_type(pdf_or_image_path)
-    # Check for required PDF utilities for PDFs
-    ext = os.path.splitext(pdf_or_image_path)[1].lower()
-    is_image = ext not in [".pdf"]
     
-    # Only check for PDF utilities if working with PDFs
-    if not is_image and not pdf_utils_available:
-        raise RuntimeError(
-            "PDF utilities (pdfinfo, pdftoppm) are not available. "
-            "Please install Poppler utilities to process PDF files. "
-            "Run `from typhoon_ocr import check_dependencies` "
-            "and then `check_dependencies()` for installation instructions."
-        )
-    
-    openai = OpenAI(base_url=base_url, api_key=api_key or os.getenv("TYPHOON_OCR_API_KEY") or os.getenv("OPENAI_API_KEY"))
+    openai = OpenAI(base_url=base_url, api_key=api_key or os.getenv("TYPHOON_OCR_API_KEY") or os.getenv('TYPHOON_API_KEY') or os.getenv("OPENAI_API_KEY"))
     messages = prepare_ocr_messages(
         pdf_or_image_path=pdf_or_image_path,
         task_type=task_type,

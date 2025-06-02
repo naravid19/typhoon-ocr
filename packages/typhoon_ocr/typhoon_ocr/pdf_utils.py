@@ -35,48 +35,6 @@ def check_pdf_utilities():
     
     return True
 
-def check_dependencies():
-    """
-    Check if all required dependencies for Typhoon OCR are installed.
-    
-    This function verifies the presence of:
-    1. Poppler utilities (pdfinfo, pdftoppm)
-    2. Required Python packages
-    
-    Returns:
-        dict: A dictionary containing the status of each dependency category
-              and installation instructions for any missing dependencies.
-    """
-    result = {
-        "pdf_utilities": {
-            "installed": True,
-            "missing": [],
-            "instructions": ""
-        },
-        "all_dependencies_installed": True
-    }
-    
-    # Check PDF utilities
-    missing_utils = []
-    if shutil.which("pdfinfo") is None:
-        missing_utils.append("pdfinfo")
-    
-    if shutil.which("pdftoppm") is None:
-        missing_utils.append("pdftoppm")
-    
-    if missing_utils:
-        result["pdf_utilities"]["installed"] = False
-        result["pdf_utilities"]["missing"] = missing_utils
-        result["pdf_utilities"]["instructions"] = (
-            "Installation instructions for Poppler utilities:\n"
-            "- macOS: Run 'brew install poppler'\n"
-            "- Ubuntu/Debian: Run 'apt-get install poppler-utils'\n"
-            "- Windows: Install from https://github.com/oschwartz10612/poppler-windows/releases/ and add to PATH"
-        )
-        result["all_dependencies_installed"] = False
-    
-    return result
-
 pdf_utils_available = check_pdf_utilities()
 if not pdf_utils_available:
     message = ('PDF utilities are not available.'
