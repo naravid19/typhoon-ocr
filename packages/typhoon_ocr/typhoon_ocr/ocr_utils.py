@@ -82,6 +82,7 @@ def get_pdf_media_box_width_height(local_pdf_path: str, page_num: int) -> tuple[
     :param page_num: The page number for which to extract MediaBox dimensions
     :return: A dictionary containing MediaBox dimensions or None if not found
     """
+        
     # Construct the pdfinfo command to extract info for the specific page
     command = ["pdfinfo", "-f", str(page_num), "-l", str(page_num), "-box", "-enc", "UTF-8", local_pdf_path]
     # Run the command using subprocess
@@ -103,6 +104,7 @@ def get_pdf_media_box_width_height(local_pdf_path: str, page_num: int) -> tuple[
     raise ValueError("MediaBox not found in the PDF info.")
     
 def render_pdf_to_base64png(local_pdf_path: str, page_num: int, target_longest_image_dim: int = 2048) -> str:
+        
     longest_dim = max(get_pdf_media_box_width_height(local_pdf_path, page_num))
 
     # Convert PDF page to PNG using pdftoppm
@@ -470,10 +472,12 @@ def prepare_ocr_messages(
         >>> # Process an image file (always page 1)
         >>> messages = prepare_ocr_messages("scan.jpg")
     """
-    # Determine if the file is a PDF or image
+    # Check for required PDF utilities
     ext = os.path.splitext(pdf_or_image_path)[1].lower()
-    filename = pdf_or_image_path
     is_image = ext not in [".pdf"]
+    
+    # Determine if the file is a PDF or image
+    filename = pdf_or_image_path
     
     # If the file is not a PDF, convert it and ensure page_num is 1
     if is_image:
@@ -549,16 +553,34 @@ def detect_input_type(input_string: str) -> str:
             return input_string
     return input_string
 
-def ocr_document(pdf_or_image_path: str, task_type: str = "default", target_image_dim: int = 1800, target_text_length: int = 8000, page_num: int = 1, base_url: str = 'https://api.opentyphoon.ai/v1', api_key: str = None, model: str = "typhoon-ocr-preview") -> str:
+def ocr_document(pdf_or_image_path: str, task_type: str = "default", target_image_dim: int = 1800, target_text_length: int = 8000, page_num: int = 1, base_url: str = os.getenv("TYPHOON_BASE_URL", 'https://api.opentyphoon.ai/v1'), api_key: str = None, model: str = "typhoon-ocr-preview") -> str:
     """
     OCR a PDF or image file.
     
     This function provides an end-to-end workflow that combines multiple processing steps
     into a single call, creating messages ready for OCR processing with language models.
     It handles both image and PDF inputs, with appropriate page selection for PDFs.
+    
+    Args:
+        pdf_or_image_path (str): Path to a PDF or image file to process
+        task_type (str): Type of OCR task - "default" for standard markdown extraction,
+                         "structure" for enhanced layout analysis with HTML tables
+        target_image_dim (int): Target longest dimension for the rendered image in pixels
+        target_text_length (int): Maximum length of extracted text to include
+        page_num (int): Page number to process (default=1, for images always 1)
+        base_url (str): API base URL
+        api_key (str): API key for authentication (will also check environment variables if None)
+        model (str): Model identifier to use for OCR
+        
+    Returns:
+        str: Extracted text content in the specified format
+        
+    Raises:
+        ValueError: If image conversion fails, page number is out of range, or other processing errors occur
     """
     pdf_or_image_path = detect_input_type(pdf_or_image_path)
-    openai = OpenAI(base_url=base_url, api_key=api_key or os.getenv("TYPHOON_OCR_API_KEY") or os.getenv("OPENAI_API_KEY"))
+    
+    openai = OpenAI(base_url=base_url, api_key=api_key or os.getenv("TYPHOON_OCR_API_KEY") or os.getenv('TYPHOON_API_KEY') or os.getenv("OPENAI_API_KEY"))
     messages = prepare_ocr_messages(
         pdf_or_image_path=pdf_or_image_path,
         task_type=task_type,
