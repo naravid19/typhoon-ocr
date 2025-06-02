@@ -105,14 +105,21 @@ with gr.Blocks(theme=theme) as demo:
             # Update file_types to accept PDF as well as common image formats.
             pdf_input = gr.File(label="📄 Upload Image file or PDF file", file_types=[".pdf", ".png", ".jpg", ".jpeg"])
             
-            with gr.Box():
+            with gr.Group(elem_classes=["task-background"]):
                 task_dropdown = gr.Radio(["default", "structure"], label="🎯 Select Task", value="default")
                 gr.HTML("""
                 <p><b>default</b>: This mode works for most cases and is recommended for files without a clear template such as infographics.</p>
-                <p><b>structure</b>: This mode offers improved performance for structured documents such as formal documents and forms.</p>
+                <p><b>structure</b>: This mode offers improved performance for complex layout documents such as those containing images, tables and forms.</p>
                 <p>We recommend trying both and see which one works better for your use case.</p>
                 """, elem_classes=["task-dropdown-info"])
                 demo.css = """
+                .task-background {
+                    background: var(--block-background-fill) !important;
+                    
+                }
+                .task-background > * {
+                    background: var(--block-background-fill) !important;
+                }
                 .task-dropdown-info {
                     padding: 0 16px;
                     font-size: 12px;
