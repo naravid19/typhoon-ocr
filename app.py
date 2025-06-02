@@ -104,7 +104,20 @@ with gr.Blocks(theme=theme) as demo:
         with gr.Column(scale=1):
             # Update file_types to accept PDF as well as common image formats.
             pdf_input = gr.File(label="📄 Upload Image file or PDF file", file_types=[".pdf", ".png", ".jpg", ".jpeg"])
-            task_dropdown = gr.Dropdown(["default", "structure"], label="🎯 Select Task", value="default")
+            
+            with gr.Box():
+                task_dropdown = gr.Radio(["default", "structure"], label="🎯 Select Task", value="default")
+                gr.HTML("""
+                <p><b>default</b>: for infographic and general documents</p>
+                <p><b>structure</b>: for documents with complex layout and images</p>
+                <p>We recommend using trying both and see which one works better for your use case.</p>
+                """, elem_classes=["task-dropdown-info"])
+                demo.css = """
+                .task-dropdown-info {
+                    padding: 0 16px;
+                    font-size: 12px;
+                }
+                """
             page_number = gr.Number(label="📄 Page Number (for PDFs only)", value=1, minimum=1, step=1)
             run_button = gr.Button("🚀 Run")
             image_output = gr.Image(label="📸 Preview Image", type="pil")
