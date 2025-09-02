@@ -1,5 +1,8 @@
 ## Typhoon OCR
 
+[![Thai](https://img.shields.io/badge/README-ไทย-blue)](README.th.md) [![English](https://img.shields.io/badge/README-English-lightgrey)](README.md)
+
+
 Typhoon OCR is a model for extracting structured markdown from images or PDFs. It supports document layout analysis and table extraction, returning results in markdown or HTML. This package is a simple Gradio website to demonstrate the performance of Typhoon OCR.
 
 > **This fork focuses on Windows 10/11 usage.** For macOS/Linux setup, please refer to the official Typhoon OCR repository.
