@@ -1,5 +1,8 @@
 ## Typhoon OCR (Windows Fork)
 
+[![README TH](https://img.shields.io/badge/README-TH-lightgrey?style=flat)](README.th.md) [![README EN](https://img.shields.io/badge/README-EN-blue?style=flat)](README.md)
+
+
 Typhoon OCR คือโมเดลสำหรับแปลงเอกสารรูปภาพหรือ PDF ให้เป็น **Markdown/HTML** พร้อมวิเคราะห์โครงร่างเอกสาร (layout) และตาราง เพื่อสาธิตการทำงาน มีเว็บตัวอย่างด้วย **Gradio**
 
 > **หมายเหตุ:** รีโพนี้เป็น **fork สำหรับ Windows 10/11 โดยเฉพาะ** (โฟกัสการติดตั้งและใช้งานบน Windows)  
@@ -54,7 +57,7 @@ python app.py
 > หมายเหตุ: **vLLM ไม่รองรับบน Windows แบบ native**  
 > หากต้องการรันเซิร์ฟเวอร์โมเดลในเครื่อง ให้ใช้ **WSL2 (Ubuntu)** หรือเลือกใช้ **Remote API**
 
-### เริ่ม vLLM (ตัวเลือก — รันใน WSL2 เท่านั้น)
+### เริ่ม vLLM (ตัวเลือก: รันใน WSL2 เท่านั้น)
 คำสั่งตัวอย่าง (รัน **ภายใน WSL2/Ubuntu** ไม่ใช่ PowerShell ของ Windows โดยตรง):
 ```bash
 vllm serve scb10x/typhoon-ocr-7b --served-model-name typhoon-ocr --dtype bfloat16 --port 8101
