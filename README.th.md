@@ -1,40 +1,48 @@
 ## Typhoon OCR (Windows Fork)
 
-[![README TH](https://img.shields.io/badge/README-TH-lightgrey?style=flat)](README.th.md) [![README EN](https://img.shields.io/badge/README-EN-blue?style=flat)](README.md)
+[![README TH](https://img.shields.io/badge/README-TH-blue?style=flat)](README.th.md) [![README EN](https://img.shields.io/badge/README-EN-lightgrey?style=flat)](README.md)
 
+Typhoon OCR คือโมเดลสำหรับแปลงเอกสารรูปภาพหรือ PDF ให้เป็น **Markdown/HTML** พร้อมวิเคราะห์โครงร่างเอกสารและตาราง โปรเจกต์นี้คือหน้าเว็บ **Gradio** สำหรับสาธิตการทำงานของ Typhoon OCR
 
-Typhoon OCR คือโมเดลสำหรับแปลงเอกสารรูปภาพหรือ PDF ให้เป็น **Markdown/HTML** พร้อมวิเคราะห์โครงร่างเอกสาร (layout) และตาราง เพื่อสาธิตการทำงาน มีเว็บตัวอย่างด้วย **Gradio**
-
-> **หมายเหตุ:** รีโพนี้เป็น **fork สำหรับ Windows 10/11 โดยเฉพาะ** (โฟกัสการติดตั้งและใช้งานบน Windows)  
-> วิธีติดตั้งบน **macOS/Linux** โปรดดูจากรีโพ **Typhoon OCR official**
+> **หมายเหตุ:** รีโพนี้โฟกัส **Windows 10/11** เท่านั้น วิธีติดตั้งบน **macOS/Linux** โปรดดูที่รีโพทางการ
 
 ### คุณสมบัติ (Features)
-- อัปโหลด PDF หรือรูปภาพได้ (1 หน้า)
-- ดึงข้อความและสร้างเอกสารใหม่เป็น Markdown
-- มีโหมดพรอมต์สำหรับ layout/structure
-- รองรับภาษาอังกฤษและภาษาไทย
-- เรียกใช้งานผ่าน API รูปแบบ OpenAI-compatible (เช่น vLLM, opentyphoon.ai)
-- บทความเพิ่มเติม: https://opentyphoon.ai/blog/en/typhoon-ocr-release
+- อัปโหลด PDF หรือรูปภาพ
+- **เลือกหลายหน้า (PDF)**: ทุกหน้า / ช่วงหน้า / หน้าเดียว
+- **พรีวิวแบบแกลเลอรี** ของหน้าที่เลือก
+- **แถบความคืบหน้า** ระหว่างทำ OCR
+- แปลงผลลัพธ์เป็น Markdown (โหมด `default` ตารางเป็น Markdown, โหมด `structure` ตารางเป็น HTML)
+- โหมดพรอมต์ 2 แบบ: `default`, `structure`
+- รองรับภาษาอังกฤษและไทย
+- เรียกผ่าน API รูปแบบ OpenAI-compatible (ผู้ให้บริการภายนอก หรือ vLLM บน WSL2)
 
 ### ข้อกำหนด (Requirements)
 - Windows 10/11 พร้อม Python 3.10 ขึ้นไป
 
 ### ติดตั้งแพ็กเกจ (Install)
-ติดตั้งเฉพาะแพ็กเกจ `typhoon-ocr`:
 ```bash
 pip install typhoon-ocr
+# หรือถ้าจะรันเดโม:
+pip install -r requirements.txt
 ```
 
-หรือเตรียมรันเว็บเดโม Gradio จากโปรเจกต์นี้:
-```bash
-pip install -r requirements.txt
-# แก้ไฟล์ .env ให้ถูกต้อง
-# (ตัวเลือก) ติดตั้ง vLLM หากต้องการโฮสต์โมเดลในเครื่อง
-# pip install vllm
+### ตั้งค่าไฟล์ `.env`
+
+สร้างไฟล์ `.env` ไว้ที่โฟลเดอร์โปรเจกต์:
+
+```ini
+# จุดปลาย API รูปแบบ OpenAI-compatible (ผู้ให้บริการภายนอก หรือ vLLM ใน WSL2)
+TYPHOON_BASE_URL=https://api.opentyphoon.ai/v1
+# คีย์สำหรับ API ดังกล่าว
+TYPHOON_API_KEY=YOUR_KEY
+# ชื่อโมเดลที่ปลายทางเปิดให้เรียก
+TYPHOON_OCR_MODEL=typhoon-ocr
 ```
+
+> ถ้ารัน vLLM ใน WSL2 ให้ตั้งค่า `TYPHOON_BASE_URL=http://127.0.0.1:8101/v1` และ `TYPHOON_API_KEY=dummy`
 
 ### ตั้งค่า Windows (ติดตั้ง Poppler + เพิ่ม PATH)
-โปรเจกต์ต้องใช้เครื่องมือจาก Poppler คือ `pdfinfo` และ `pdftoppm` เพื่ออ่าน PDF  
+ต้องมีเครื่องมือจาก Poppler (`pdfinfo`, `pdftoppm`) เพื่ออ่าน PDF  
 ใช้คำสั่งเดียวด้านล่างนี้ใน **PowerShell** (ไม่ต้องสิทธิ์แอดมิน) เพื่อติดตั้งและเพิ่ม **User PATH** แบบถาวร
 
 ```powershell
@@ -48,22 +56,22 @@ pdftoppm -v
 ```
 
 ### รัน Gradio Demo
-ตั้งค่าตัวแปรแวดล้อมในไฟล์ `.env` ให้เรียบร้อย (เช่น API base/key ถ้าเรียกใช้บริการภายนอก) แล้วรัน:
-
 ```bash
 python app.py
 ```
 
-> หมายเหตุ: **vLLM ไม่รองรับบน Windows แบบ native**  
-> หากต้องการรันเซิร์ฟเวอร์โมเดลในเครื่อง ให้ใช้ **WSL2 (Ubuntu)** หรือเลือกใช้ **Remote API**
+> **vLLM ไม่รองรับบน Windows แบบ native** หากต้องการโฮสต์โมเดลในเครื่อง ให้ใช้ **WSL2 (Ubuntu)** หรือเลือกใช้ **Remote API**
 
 ### เริ่ม vLLM (ตัวเลือก: รันใน WSL2 เท่านั้น)
-คำสั่งตัวอย่าง (รัน **ภายใน WSL2/Ubuntu** ไม่ใช่ PowerShell ของ Windows โดยตรง):
 ```bash
 vllm serve scb10x/typhoon-ocr-7b --served-model-name typhoon-ocr --dtype bfloat16 --port 8101
 ```
 
-จากนั้นตั้งค่า `.env` ให้ `OPENAI_BASE_URL` ชี้ไปที่ `http://127.0.0.1:8101/v1` และ `OPENAI_API_KEY` เป็นค่าจำลองได้
+### สิ่งที่ปรับปรุงใน fork นี้
+- เพิ่ม **หลายหน้า** (ทุกหน้า/ช่วงหน้า/หน้าเดียว) พร้อม **แกลเลอรีพรีวิว** และ **แถบความคืบหน้า**
+- ปรับการตีความผล LLM: ถ้าไม่ใช่ JSON จะคืนข้อความดิบ
+- ใช้ตัวแปรแวดล้อม `TYPHOON_BASE_URL`, `TYPHOON_API_KEY`, `TYPHOON_OCR_MODEL`
+- เพิ่มการพึ่งพา `pypdf` สำหรับนับจำนวนหน้า PDF
 
 ### ไลบรารีที่ใช้ (Dependencies)
 - openai
@@ -71,17 +79,15 @@ vllm serve scb10x/typhoon-ocr-7b --served-model-name typhoon-ocr --dtype bfloat1
 - ftfy
 - pypdf
 - gradio
-- vllm (จำเป็นเฉพาะกรณีโฮสต์โมเดลในเครื่อง/WSL2)
 - pillow
+- vllm (ใช้เฉพาะกรณีโฮสต์ inference server บน WSL2; ไม่รองรับบน Windows โดยตรง)
 
 ### แก้ปัญหา (Debug)
-หากขึ้น `Error processing document` บน Windows:
+หากขึ้น `Error processing document` บน Windows ให้ตรวจว่า Poppler ติดตั้งและอยู่ใน PATH (ดูหัวข้อด้านบน) แล้วลอง:
 ```powershell
-# ตรวจสอบว่า Poppler ติดตั้งและอยู่ใน PATH
 pdfinfo -v
 pdftoppm -v
 ```
-ถ้าไม่พบคำสั่ง ให้ย้อนดูหัวข้อ **ตั้งค่า Windows (ติดตั้ง Poppler + เพิ่ม PATH)** ด้านบน
 
 ### ใบอนุญาต (License)
 โปรเจกต์นี้ใช้สัญญาอนุญาตแบบ Apache 2.0  
