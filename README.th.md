@@ -73,6 +73,18 @@ vllm serve scb10x/typhoon-ocr-7b --served-model-name typhoon-ocr --dtype bfloat1
 - ใช้ตัวแปรแวดล้อม `TYPHOON_BASE_URL`, `TYPHOON_API_KEY`, `TYPHOON_OCR_MODEL`
 - เพิ่มการพึ่งพา `pypdf` สำหรับนับจำนวนหน้า PDF
 
+
+
+### บันทึกการเปลี่ยนแปลง (Changelog)
+
+#### 2025-09-02
+- เพิ่มโฟลว์หลายหน้าสำหรับ PDF (ทุกหน้า/ช่วงหน้า/หน้าเดียว) พร้อมแกลเลอรีพรีวิวและแถบความคืบหน้า
+- ปรับการตีความผลลัพธ์ให้ทนทานขึ้น: หากไม่ใช่ JSON จะคืนข้อความดิบทั้งหมด
+- กำหนดมาตรฐานตัวแปรแวดล้อม: `TYPHOON_BASE_URL`, `TYPHOON_API_KEY`, `TYPHOON_OCR_MODEL`
+  - การเปลี่ยนแปลงที่มีผลกระทบ: ใช้ `TYPHOON_OCR_MODEL` แทน `MODEL`
+- เพิ่มการพึ่งพา `pypdf` สำหรับนับจำนวนหน้า PDF
+- ปรับปรุงเอกสาร: โฟกัส Windows, ปุ่มสลับภาษา TH/EN, สคริปต์ติดตั้ง Poppler แบบไม่ใช้ `setx`, อธิบายการใช้ vLLM ผ่าน WSL2
+
 ### ไลบรารีที่ใช้ (Dependencies)
 - openai
 - python-dotenv
