@@ -1,6 +1,6 @@
 ## Typhoon OCR
 
-[![Thai](https://img.shields.io/badge/README-ไทย-blue)](README.th.md) [![English](https://img.shields.io/badge/README-English-lightgrey)](README.md)
+[![README TH](https://img.shields.io/badge/README-TH-blue?style=flat)](README.th.md) [![README EN](https://img.shields.io/badge/README-EN-lightgrey?style=flat)](README.md)
 
 
 Typhoon OCR is a model for extracting structured markdown from images or PDFs. It supports document layout analysis and table extraction, returning results in markdown or HTML. This package is a simple Gradio website to demonstrate the performance of Typhoon OCR.
@@ -55,7 +55,7 @@ python app.py
 ```
 
 > Local inference with **vLLM** is not supported natively on Windows. Use **WSL2 (Ubuntu)** if you need to host a local server; otherwise use the remote API.
-### Start vllm (Optional — via WSL2)
+### Start vllm (Optional: via WSL2)
 
 > On Windows, run this inside **WSL2 (Ubuntu)**. Native Windows is not supported.
 
