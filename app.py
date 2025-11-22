@@ -246,15 +246,13 @@ def create_ui():
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        white-space: nowrap;
-        font-weight: 500;
         transition: all 0.2s;
         cursor: pointer;
         outline: none;
-        height: 24px;
+        height: 28px;
+        width: 28px;
         border-radius: 4px;
-        padding: 0 8px;
-        font-size: 0.75rem;
+        padding: 0;
         color: #9ca3af;
         background-color: transparent;
         border: none !important;
@@ -264,9 +262,12 @@ def create_ui():
         color: #e5e7eb;
     }
     .minimal-copy-btn svg {
-        width: 14px;
-        height: 14px;
-        margin-right: 4px;
+        width: 16px;
+        height: 16px;
+    }
+    /* Hidden Bridge Button */
+    .hidden-btn {
+        display: none !important;
     }
     """
 
@@ -352,38 +353,27 @@ def create_ui():
                 
                 # Output Group with Header Row
                 with gr.Group(elem_classes=["output-group"]):
-                    # Header Row
-                    with gr.Row(elem_classes=["output-header"]):
-                        gr.HTML('<span class="output-header-label">OUTPUT</span>')
-                        gr.HTML("""
-                            <button onclick="window.copyToClipboard()" class="minimal-copy-btn" title="Copy to clipboard">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path></svg>
-                                Copy
+                    # Header Row (Single HTML block for perfect control)
+                    gr.HTML("""
+                        <div class="output-header">
+                            <span class="output-header-label">OUTPUT</span>
+                            <button onclick="document.getElementById('real_copy_btn').click()" class="minimal-copy-btn" title="Copy to clipboard">
+                                <span class="icon-container">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path></svg>
+                                </span>
                             </button>
-                            <script>
-                                window.copyToClipboard = function() {
-                                    const textarea = document.querySelector('.output-box textarea');
-                                    if (textarea) {
-                                        navigator.clipboard.writeText(textarea.value).then(() => {
-                                            const btn = document.querySelector('.minimal-copy-btn');
-                                            const originalHTML = btn.innerHTML;
-                                            btn.innerHTML = '<span style="color: #4ade80;">Copied!</span>';
-                                            setTimeout(() => {
-                                                btn.innerHTML = originalHTML;
-                                            }, 2000);
-                                        }).catch(err => {
-                                            console.error('Failed to copy:', err);
-                                        });
-                                    }
-                                }
-                            </script>
-                        """)
+                        </div>
+                    """)
+                    
+                    # Hidden Bridge Button
+                    real_copy_btn = gr.Button("Copy Real", elem_id="real_copy_btn", elem_classes=["hidden-btn"])
                     
                     result_output = gr.Textbox(
                         label="Markdown Output", 
                         lines=15, 
                         show_copy_button=False, 
                         elem_classes=["output-box"],
+                        elem_id="ocr_result_box",
                         show_label=False,
                         placeholder="Upload an image/PDF and run OCR to see results"
                     )
@@ -391,7 +381,72 @@ def create_ui():
         # State management
         result_state = gr.State("")
 
+        # --- JavaScript for Robust Copy ---
+        robust_copy_js = """
+        (text) => {
+            // 1. Visual Feedback Function
+            const showSuccess = () => {
+                const btn = document.querySelector('.minimal-copy-btn .icon-container');
+                if (btn) {
+                    const originalIcon = btn.innerHTML;
+                    btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-check"><path d="M20 6 9 17l-5-5"/></svg>';
+                    setTimeout(() => {
+                        btn.innerHTML = originalIcon;
+                    }, 2000);
+                }
+            };
+
+            // 2. Robust Copy Logic
+            if (!text) {
+                console.warn("No text to copy");
+                return;
+            }
+
+            // Try Clipboard API first
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text).then(showSuccess).catch(err => {
+                    console.error("Clipboard API failed, trying fallback...", err);
+                    fallbackCopy(text);
+                });
+            } else {
+                fallbackCopy(text);
+            }
+
+            function fallbackCopy(text) {
+                const textArea = document.createElement("textarea");
+                textArea.value = text;
+                
+                // Ensure it's not visible but part of DOM
+                textArea.style.position = "fixed";
+                textArea.style.left = "-9999px";
+                textArea.style.top = "0";
+                document.body.appendChild(textArea);
+                
+                textArea.focus();
+                textArea.select();
+                
+                try {
+                    const successful = document.execCommand('copy');
+                    if (successful) {
+                        showSuccess();
+                    } else {
+                        console.error("Fallback copy failed.");
+                        alert("Copy failed. Please copy manually.");
+                    }
+                } catch (err) {
+                    console.error("Fallback copy error:", err);
+                    alert("Copy failed. Please copy manually.");
+                }
+                
+                document.body.removeChild(textArea);
+            }
+        }
+        """
+
         # --- Event Handlers ---
+        
+        # Wire up the hidden button to the JS function
+        real_copy_btn.click(None, [result_output], None, js=robust_copy_js)
 
         def on_file_change(f):
             if f is None:
