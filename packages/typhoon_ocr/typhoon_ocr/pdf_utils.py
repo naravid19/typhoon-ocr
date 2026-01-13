@@ -35,12 +35,5 @@ def check_pdf_utilities():
     
     return True
 
+# Check PDF utilities availability (will be checked at runtime when needed)
 pdf_utils_available = check_pdf_utilities()
-if not pdf_utils_available:
-    message = ('PDF utilities are not available.'
-            "Installation instructions for Poppler utilities:\n"
-            "- macOS: Run 'brew install poppler'\n"
-            "- Ubuntu/Debian: Run 'apt-get install poppler-utils'\n"
-            "- Windows: Install from https://github.com/oschwartz10612/poppler-windows/releases/ and add to PATH"
-        )
-    raise ImportError(message)
