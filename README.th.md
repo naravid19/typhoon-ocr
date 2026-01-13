@@ -70,7 +70,7 @@
 
 ## เกี่ยวกับโปรเจกต์
 
-[![Product Name Screen Shot][product-screenshot]](https://github.com/naravid19/typhoon-ocr)
+[![Product Name Screen Shot][product-screenshot]](https://github.com/naravid19/typhoon-ocr/images/screenshot.png)
 
 Typhoon OCR คือโมเดลสำหรับแปลงเอกสารรูปภาพหรือ PDF ให้เป็น **Markdown/HTML** พร้อมวิเคราะห์โครงร่างเอกสารและตาราง
 
