@@ -160,7 +160,15 @@ pdftoppm -v
 
 5. **รันแอปพลิเคชัน**
 
-   Terminal 1 - Backend:
+   ### ทางเลือก A: เริ่มต้นแบบคลิกเดียว (แนะนำ)
+
+   เพียงดับเบิลคลิกที่ไฟล์ **`start_app.bat`** ในโฟลเดอร์หลัก
+
+   > สคริปต์จะตรวจสอบสภาพแวดล้อม (Virtual Environment) และเปิดเบราว์เซอร์ให้โดยอัตโนมัติ
+
+   ### ทางเลือก B: เริ่มต้นแบบ Manual
+
+   **Terminal 1 - Backend:**
 
    ```sh
    python -m uvicorn backend.main:app --reload --port 8000

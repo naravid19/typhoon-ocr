@@ -160,7 +160,15 @@ pdftoppm -v
 
 5. **Run the application**
 
-   Terminal 1 - Backend:
+   ### Option A: One-Click Start (Recommended)
+
+   Simply double-click the **`start_app.bat`** file in the project root.
+
+   > The script automatically detects your virtual environment and opens the browser for you.
+
+   ### Option B: Manual Start
+
+   **Terminal 1 - Backend:**
 
    ```sh
    python -m uvicorn backend.main:app --reload --port 8000
