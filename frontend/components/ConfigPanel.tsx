@@ -19,6 +19,7 @@ interface ConfigPanelProps {
   setFile: (file: File | null) => void;
   onSubmit: () => void;
   isLoading: boolean;
+  onNumPagesChange?: (numPages: number | null) => void;
 }
 
 export function ConfigPanel({
@@ -27,13 +28,20 @@ export function ConfigPanel({
   file,
   setFile,
   onSubmit,
-  isLoading
+  isLoading,
+  onNumPagesChange
 }: ConfigPanelProps) {
   const [activeTab, setActiveTab] = useState<"files" | "params">("files");
   const [urlInput, setUrlInput] = useState("");
   const [numPages, setNumPages] = useState<number | null>(null);
   const [isLoadingUrl, setIsLoadingUrl] = useState(false);
   const [urlError, setUrlError] = useState<string | null>(null);
+
+  // Notify parent of page count changes
+  const handleNumPagesChange = (pages: number) => {
+    setNumPages(pages);
+    onNumPagesChange?.(pages);
+  };
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     if (acceptedFiles.length > 0) {
@@ -221,12 +229,14 @@ export function ConfigPanel({
                   </div>
                   
                   {file.type === 'application/pdf' ? (
-                     <PdfPreview 
-                        file={file} 
-                        options={options} 
-                        setOptions={setOptions} 
-                        onNumPagesChange={setNumPages} 
-                     />
+                     <div className="max-h-[400px] overflow-y-auto rounded-lg border border-zinc-800 p-2 scroll-smooth scrollbar-thin scrollbar-thumb-zinc-700">
+                       <PdfPreview 
+                          file={file} 
+                          options={options} 
+                          setOptions={setOptions} 
+                          onNumPagesChange={handleNumPagesChange} 
+                       />
+                     </div>
                   ) : (
                      // Image Preview (Single Item Grid)
                      <div className="grid grid-cols-2 gap-3">

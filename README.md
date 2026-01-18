@@ -61,6 +61,7 @@
     <li><a href="#roadmap">Roadmap</a></li>
     <li><a href="#contributing">Contributing</a></li>
     <li><a href="#license">License</a></li>
+    <li><a href="CHANGELOG.md">Changelog</a></li>
     <li><a href="#contact">Contact</a></li>
     <li><a href="#acknowledgments">Acknowledgments</a></li>
   </ol>
@@ -83,6 +84,8 @@ This fork provides a modern **Next.js web application** alongside the original G
 - 🎨 **Compare mode** to view original and extracted text side-by-side
 
 > **This fork focuses on Windows 10/11.** For macOS/Linux setup, please refer to the official Typhoon OCR repository.
+>
+> 📝 **See [CHANGELOG.md](CHANGELOG.md) for latest updates.**
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
