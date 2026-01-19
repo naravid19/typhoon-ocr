@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.0.2] - 2026-01-19
+
+### Added
+
+- **Professional Startup Script**: Completely redesigned `start_app.bat` with modern UI featuring Unicode box-drawing characters.
+- **Enhanced Dependency Checks**: Added version display for Python, Node.js, npm, and optional pdfinfo (Poppler) detection.
+- **Auto-Install Dependencies**: Script now automatically installs missing pip packages before starting the backend.
+- **API Documentation Link**: Added quick access to Swagger docs at `http://localhost:8000/docs`.
+- **Tips Section**: Helpful tips for users on how to manage servers.
+
+### Changed
+
+- **UTF-8 Encoding**: Startup script now uses `chcp 65001` for proper Unicode/emoji support.
+- **Improved Virtual Environment Detection**: Enhanced auto-detection logic for `venv`, `.venv`, `env`, and any custom-named virtual environments.
+- **Better Error Handling**: Centralized error handling with styled error messages and download links.
+- **Visual Design**: Progress indicators (`[1/3]`, `[2/3]`, `[3/3]`) and Unicode separators for better readability.
+
+### Fixed
+
+- **Dependency Conflicts**: Resolved Gradio compatibility issues by pinning `pillow<12.0` and `pydantic<2.12`.
+
+---
+
 ## [v1.0.1] - 2026-01-18
 
 ### Added
@@ -23,6 +46,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Backend Performance**: Refactored OCR service to use `run_in_threadpool` for non-blocking execution.
 - **UI Improvements**: Fixed layout scrolling issues in PDF preview and results panel.
 - **Code Refactoring**: Cleaned up `ResponsePanel` and improved state management.
+
+---
 
 ## [v1.0.0] - 2026-01-13
 
