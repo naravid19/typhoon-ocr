@@ -38,7 +38,7 @@ class TestE2EOCR:
         # Get the path to the test image
         test_image_path = os.path.join(
             os.path.dirname(__file__), 
-            "..", "examples", "test.png"
+            "..", "..", "examples", "test.png"
         )
         
         # Verify the test image exists
@@ -88,7 +88,7 @@ class TestE2EOCR:
         
         test_image_path = os.path.join(
             os.path.dirname(__file__), 
-            "..", "examples", "test.png"
+            "..", "..", "examples", "test.png"
         )
         
         # Test with "default" task type
@@ -121,7 +121,7 @@ class TestE2EOCR:
         
         test_image_path = os.path.join(
             os.path.dirname(__file__), 
-            "..", "examples", "test.png"
+            "..", "..", "examples", "test.png"
         )
         
         result = ocr_document(

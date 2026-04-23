@@ -1,3 +1,5 @@
+export type OcrTaskType = "default" | "structure" | "v1.5";
+
 export interface OcrPageResult {
   page: number;
   success: boolean;
@@ -16,7 +18,7 @@ export interface OcrResult {
 
 export interface OcrOptions {
   model: string;
-  task_type: string;
+  task_type: OcrTaskType;
   max_tokens: number;
   temperature: number;
   top_p: number;

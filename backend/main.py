@@ -7,11 +7,17 @@ Provides OCR processing endpoints for the Next.js frontend.
 """
 
 import sys
+import os
 from pathlib import Path
 
 # Add backend directory to path for module discovery
 backend_dir = Path(__file__).parent
 sys.path.insert(0, str(backend_dir))
+
+# Add Poppler to PATH
+poppler_path = backend_dir.parent / "poppler" / "poppler-24.08.0" / "Library" / "bin"
+if poppler_path.exists():
+    os.environ["PATH"] += os.pathsep + str(poppler_path.absolute())
 
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
@@ -59,4 +65,4 @@ async def health_check():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8123)

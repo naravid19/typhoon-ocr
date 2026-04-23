@@ -1,10 +1,16 @@
+import dynamic from "next/dynamic";
 import { useState, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
 import rehypeHighlight from "rehype-highlight";
 import { Copy, Check, Eye, Clock, Zap, Columns, LayoutList, ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { OcrResult, OcrOptions } from "@/types/ocr";
-import { CodeGenerator } from "./CodeGenerator";
+import { markdownToPlainText } from "@/utils/markdownText";
+
+const CodeGenerator = dynamic(() => import("./CodeGenerator").then(mod => mod.CodeGenerator), { 
+  ssr: false,
+  loading: () => <div className="h-20 bg-[#0c0c0e] animate-pulse" />
+});
 
 import "highlight.js/styles/github-dark.css";
 
@@ -48,19 +54,21 @@ const getProgressMessage = (currentPage: number, totalPages: number): string => 
 };
 
 export function ResponsePanel({ result, options, file, isLoading, currentPage = 0, totalPages = 0 }: ResponsePanelProps) {
-  const [copied, setCopied] = useState(false);
+  const [copiedMode, setCopiedMode] = useState<"text" | "markdown" | null>(null);
   const [viewMode, setViewMode] = useState<"combined" | "compare">("combined");
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
 
-  const handleCopy = () => {
+  const handleCopy = async (mode: "text" | "markdown") => {
     if (!result) return;
     
-    // Combine text from all pages
-    const fullText = result.results.map(r => r.text).join("\n\n");
-    
-    navigator.clipboard.writeText(fullText);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    const combinedMarkdown = result.results.map(r => r.text).join("\n\n");
+    const copyPayload = mode === "text" ? markdownToPlainText(combinedMarkdown) : combinedMarkdown;
+
+    await navigator.clipboard.writeText(copyPayload);
+    setCopiedMode(mode);
+    setTimeout(() => {
+      setCopiedMode((previous) => (previous === mode ? null : previous));
+    }, 2000);
   };
 
   const currentResultPage = result?.results[currentPageIndex];
@@ -70,7 +78,7 @@ export function ResponsePanel({ result, options, file, isLoading, currentPage = 
   const prevIcon = <ChevronLeft size={16} />;
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-[#09090b] relative overflow-hidden">
+    <div suppressHydrationWarning className="flex-1 flex flex-col h-full bg-[#09090b] relative overflow-hidden">
       {/* Header Toolbar */}
       <div className="h-14 border-b border-white/10 flex items-center justify-between px-4 bg-[#09090b]/50 backdrop-blur-sm z-10 shrink-0">
         <div className="flex items-center gap-2">
@@ -134,13 +142,22 @@ export function ResponsePanel({ result, options, file, isLoading, currentPage = 
           
           <div className="h-4 w-px bg-zinc-800 mx-1"></div>
 
-          <button 
-            onClick={handleCopy}
+          <button
+            onClick={() => void handleCopy("text")}
             className="flex items-center gap-1.5 text-xs font-medium text-zinc-400 hover:text-white transition-colors"
             disabled={!result}
           >
-            {copied ? <Check size={14} className="text-green-400" /> : <Copy size={14} />}
-            Copy
+            {copiedMode === "text" ? <Check size={14} className="text-green-400" /> : <Copy size={14} />}
+            Copy Text
+          </button>
+
+          <button
+            onClick={() => void handleCopy("markdown")}
+            className="flex items-center gap-1.5 text-xs font-medium text-zinc-400 hover:text-white transition-colors"
+            disabled={!result}
+          >
+            {copiedMode === "markdown" ? <Check size={14} className="text-green-400" /> : <Copy size={14} />}
+            Copy Markdown
           </button>
         </div>
       </div>

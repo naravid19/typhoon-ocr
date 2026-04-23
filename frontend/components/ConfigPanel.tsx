@@ -1,11 +1,14 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import dynamic from 'next/dynamic';
 import { useDropzone } from "react-dropzone";
 import { Upload, X, FileText, Settings, ChevronRight, Link as LinkIcon, Image as ImageIcon, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { OcrOptions } from "@/types/ocr";
+
+const LEGACY_DEFAULT_REPETITION_PENALTY = 1.2;
+const V15_REPETITION_PENALTY = 1.1;
 
 const PdfPreview = dynamic(() => import('./PdfPreview'), { 
   ssr: false,
@@ -20,6 +23,14 @@ interface ConfigPanelProps {
   onSubmit: () => void;
   isLoading: boolean;
   onNumPagesChange?: (numPages: number | null) => void;
+  /** Whether browser notification permission is granted */
+  notificationPermission?: boolean;
+  /** Callback to request notification permission */
+  onRequestNotificationPermission?: () => Promise<boolean>;
+  /** Whether sound is enabled */
+  isSoundEnabled?: boolean;
+  /** Callback to toggle sound */
+  onToggleSound?: (enabled: boolean) => void;
 }
 
 export function ConfigPanel({
@@ -29,13 +40,29 @@ export function ConfigPanel({
   setFile,
   onSubmit,
   isLoading,
-  onNumPagesChange
+  onNumPagesChange,
+  notificationPermission,
+  onRequestNotificationPermission,
+  isSoundEnabled = true,
+  onToggleSound
 }: ConfigPanelProps) {
   const [activeTab, setActiveTab] = useState<"files" | "params">("files");
   const [urlInput, setUrlInput] = useState("");
   const [numPages, setNumPages] = useState<number | null>(null);
   const [isLoadingUrl, setIsLoadingUrl] = useState(false);
   const [urlError, setUrlError] = useState<string | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+  // Handle image preview URL
+  useEffect(() => {
+    if (file && !file.name.endsWith('.pdf') && file.type.startsWith('image/')) {
+      const url = URL.createObjectURL(file);
+      setPreviewUrl(url);
+      return () => URL.revokeObjectURL(url);
+    } else {
+      setPreviewUrl(null);
+    }
+  }, [file]);
 
   // Notify parent of page count changes
   const handleNumPagesChange = (pages: number) => {
@@ -65,6 +92,17 @@ export function ConfigPanel({
 
   const handleChange = (key: keyof OcrOptions, value: string | number) => {
     setOptions({ ...options, [key]: value });
+  };
+
+  const handleTaskTypeChange = (taskType: OcrOptions["task_type"]) => {
+    const nextOptions: OcrOptions = { ...options, task_type: taskType };
+
+    // Auto-suggest the v1.5 repetition penalty only when still using legacy default.
+    if (taskType === "v1.5" && options.repetition_penalty === LEGACY_DEFAULT_REPETITION_PENALTY) {
+      nextOptions.repetition_penalty = V15_REPETITION_PENALTY;
+    }
+
+    setOptions(nextOptions);
   };
 
   const handleLoadUrl = async () => {
@@ -242,7 +280,7 @@ export function ConfigPanel({
                      <div className="grid grid-cols-2 gap-3">
                         <div className="relative group rounded-lg overflow-hidden border border-zinc-800">
                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                           <img src={URL.createObjectURL(file)} alt="Preview" className="w-full h-auto object-cover" />
+                           {previewUrl && <img src={previewUrl} alt="Preview" className="w-full h-auto object-cover" />}
                            <div className="absolute bottom-0 inset-x-0 bg-black/60 backdrop-blur-[1px] p-1.5">
                               <p className="text-[10px] text-center text-white/90 font-medium">Original</p>
                            </div>
@@ -308,7 +346,16 @@ export function ConfigPanel({
               </div>
               <div className="flex p-1 bg-zinc-900 rounded-lg border border-zinc-800">
                 <button 
-                  onClick={() => handleChange("task_type", "default")}
+                  onClick={() => handleTaskTypeChange("v1.5")}
+                  className={cn(
+                    "flex-1 py-1.5 text-xs font-medium rounded transition-all",
+                    options.task_type === "v1.5" ? "bg-zinc-700 text-white shadow-sm" : "text-zinc-500 hover:text-zinc-300"
+                  )}
+                >
+                  v1.5
+                </button>
+                <button 
+                  onClick={() => handleTaskTypeChange("default")}
                   className={cn(
                     "flex-1 py-1.5 text-xs font-medium rounded transition-all",
                     options.task_type === "default" ? "bg-zinc-700 text-white shadow-sm" : "text-zinc-500 hover:text-zinc-300"
@@ -317,7 +364,7 @@ export function ConfigPanel({
                   Default
                 </button>
                 <button 
-                  onClick={() => handleChange("task_type", "structure")}
+                  onClick={() => handleTaskTypeChange("structure")}
                   className={cn(
                     "flex-1 py-1.5 text-xs font-medium rounded transition-all",
                     options.task_type === "structure" ? "bg-zinc-700 text-white shadow-sm" : "text-zinc-500 hover:text-zinc-300"
@@ -327,7 +374,8 @@ export function ConfigPanel({
                 </button>
               </div>
               <p className="text-xs text-zinc-500 leading-relaxed">
-                <b>Default:</b> Best for general documents.<br/>
+                <b>v1.5:</b> Recommended for higher OCR text quality and stable extraction.<br/>
+                <b>Default:</b> JSON output with markdown-friendly extraction.<br/>
                 <b>Structure:</b> Optimized for tables and complex layouts (returns HTML).
               </p>
             </div>
@@ -428,6 +476,54 @@ export function ConfigPanel({
                   className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-violet-500 transition-colors"
                 />
                 <p className="text-xs text-zinc-600">Comma separated page numbers.</p>
+            </div>
+
+            {/* Notification Settings */}
+            <div className="space-y-3 pt-4 mt-4 border-t border-zinc-800">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">🔔</span>
+                  <label className="text-sm text-zinc-400">แจ้งเตือนเมื่อเสร็จ</label>
+                </div>
+                {notificationPermission ? (
+                  <span className="text-xs px-2 py-1 rounded-full bg-green-500/10 text-green-400 border border-green-500/20">
+                    ✓ เปิดใช้งานแล้ว
+                  </span>
+                ) : (
+                  <button 
+                    onClick={onRequestNotificationPermission}
+                    className="text-xs px-3 py-1.5 rounded-lg bg-violet-500/10 text-violet-400 border border-violet-500/20 hover:bg-violet-500/20 transition-colors"
+                  >
+                    ขอสิทธิ์การแจ้งเตือน
+                  </button>
+                )}
+              </div>
+              
+              {/* Sound Toggle */}
+              <div className="flex items-center justify-between mt-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">🔊</span>
+                  <label className="text-sm text-zinc-400">เสียงแจ้งเตือน</label>
+                </div>
+                <button
+                  onClick={() => onToggleSound?.(!isSoundEnabled)}
+                  className={cn(
+                    "relative w-10 h-5 rounded-full transition-colors duration-200 ease-in-out focus:outline-none",
+                    isSoundEnabled ? "bg-violet-600" : "bg-zinc-700"
+                  )}
+                >
+                  <span
+                    className={cn(
+                      "absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow-sm transition-transform duration-200 ease-in-out",
+                      isSoundEnabled ? "translate-x-5" : "translate-x-0"
+                    )}
+                  />
+                </button>
+              </div>
+
+              <p className="text-xs text-zinc-600 mt-2">
+                รับการแจ้งเตือนจาก Browser และเสียงเมื่อประมวลผลเอกสารเสร็จสิ้น
+              </p>
             </div>
           </div>
         )}

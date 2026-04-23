@@ -3,7 +3,7 @@ import { FileText } from "lucide-react";
 
 export function Navbar() {
   return (
-    <nav className="fixed top-0 left-0 right-0 h-16 border-b border-[rgba(255,255,255,0.08)] bg-[rgba(9,9,11,0.8)] backdrop-blur-md z-50 flex items-center justify-between px-6">
+    <nav suppressHydrationWarning className="fixed top-0 left-0 right-0 h-16 border-b border-[rgba(255,255,255,0.08)] bg-[rgba(9,9,11,0.8)] backdrop-blur-md z-50 flex items-center justify-between px-6">
       <div className="flex items-center gap-4">
         <Link href="/" className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-lg bg-linear-to-br from-violet-600 to-indigo-600 flex items-center justify-center text-white font-bold">
@@ -29,7 +29,7 @@ export function Navbar() {
         >
           Documentation
         </a>
-        <div className="w-8 h-8 rounded-full bg-linear-to-tr from-violet-500 to-fuchsia-500 border border-white/10"></div>
+        <div suppressHydrationWarning className="w-8 h-8 rounded-full bg-linear-to-tr from-violet-500 to-fuchsia-500 border border-white/10"></div>
       </div>
     </nav>
   );

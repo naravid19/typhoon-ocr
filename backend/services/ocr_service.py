@@ -9,6 +9,7 @@ Handles document processing, API calls, and result formatting.
 import base64
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -21,10 +22,6 @@ from dotenv import load_dotenv
 from openai import APIConnectionError, APITimeoutError, OpenAI
 from PIL import Image
 from pypdf import PdfReader
-
-# Add packages to path for typhoon_ocr import
-packages_path = Path(__file__).parent.parent.parent / "packages"
-sys.path.insert(0, str(packages_path))
 
 import typhoon_ocr.ocr_utils
 from typhoon_ocr import prepare_ocr_messages
@@ -135,11 +132,139 @@ class TyphoonOCRService:
                 time.sleep(2 ** attempt)
             except Exception as e:
                 raise e
+    
+    def _resolve_model_name(self, model: Optional[str]) -> str:
+        """Resolve model name from request value or environment fallback."""
+        candidate = (model or "").strip()
+        if candidate:
+            return candidate
+        return self.config.MODEL_NAME
+
+    @staticmethod
+    def _extract_image_base64(messages: List[dict]) -> str:
+        """Extract preview image (base64) from prepared OCR messages."""
+        try:
+            img_url = messages[0]["content"][1]["image_url"]["url"]
+            return img_url.split(",")[-1] if "," in img_url else ""
+        except Exception:
+            return ""
+
+    @staticmethod
+    def _parse_response_text(content: Any) -> str:
+        """
+        Parse model output into final text.
+
+        Supports:
+        - Plain JSON: {"natural_text": "..."}
+        - Fenced JSON blocks
+        - Raw markdown/text fallback
+        """
+        if content is None:
+            return ""
+
+        raw_content = str(content).strip()
+        if not raw_content:
+            return ""
+
+        def _extract_from_json(candidate: str) -> Optional[str]:
+            try:
+                parsed = json.loads(candidate)
+                if isinstance(parsed, dict):
+                    natural_text = parsed.get("natural_text")
+                    if natural_text is not None:
+                        return str(natural_text)
+            except (json.JSONDecodeError, TypeError):
+                return None
+            return None
+
+        parsed_text = _extract_from_json(raw_content)
+        if parsed_text is None:
+            fenced_matches = re.findall(r"```(?:json)?\s*(\{[\s\S]*?\})\s*```", raw_content, re.IGNORECASE)
+            for candidate in fenced_matches:
+                parsed_text = _extract_from_json(candidate)
+                if parsed_text is not None:
+                    break
+
+        if parsed_text is None:
+            parsed_text = raw_content
+
+        return parsed_text.replace("<figure>", "").replace("</figure>", "").strip()
+
+    def process_single_page(
+        self,
+        file_path: str,
+        page_num: int,
+        task_type: str = "default",
+        model: Optional[str] = None,
+        max_tokens: Optional[int] = None,
+        temperature: Optional[float] = None,
+        top_p: Optional[float] = None,
+        repetition_penalty: Optional[float] = None,
+    ) -> Tuple[OcrPageResult, int]:
+        """
+        Process a single page and return page result with token usage.
+        """
+        _max_tokens = max_tokens or self.config.MAX_TOKENS
+        _temperature = temperature if temperature is not None else self.config.TEMPERATURE
+        _top_p = top_p if top_p is not None else self.config.TOP_P
+        _repetition_penalty = repetition_penalty if repetition_penalty is not None else self.config.REPETITION_PENALTY
+        resolved_model = self._resolve_model_name(model)
+
+        try:
+            messages = prepare_ocr_messages(
+                file_path,
+                task_type,
+                self.config.IMAGE_DIM,
+                self.config.TEXT_LENGTH,
+                page_num
+            )
+
+            image_base64 = self._extract_image_base64(messages)
+
+            response = self._call_api_with_retry(
+                self.client.chat.completions.create,
+                model=resolved_model,
+                messages=messages,
+                max_tokens=_max_tokens,
+                extra_body={
+                    "repetition_penalty": _repetition_penalty,
+                    "temperature": _temperature,
+                    "top_p": _top_p
+                }
+            )
+
+            token_count = 0
+            if hasattr(response, "usage") and response.usage and getattr(response.usage, "total_tokens", None):
+                token_count = int(response.usage.total_tokens)
+
+            content = response.choices[0].message.content
+            text = self._parse_response_text(content)
+
+            return (
+                OcrPageResult(
+                    page=page_num,
+                    success=True,
+                    text=text,
+                    image_base64=image_base64
+                ),
+                token_count
+            )
+
+        except Exception as e:
+            return (
+                OcrPageResult(
+                    page=page_num,
+                    success=False,
+                    error=str(e)
+                ),
+                0
+            )
 
     def process_document(
         self,
         file_path: str,
         task_type: str = "default",
+        model: Optional[str] = None,
         pages: Optional[List[int]] = None,
         max_tokens: Optional[int] = None,
         temperature: Optional[float] = None,
@@ -151,7 +276,8 @@ class TyphoonOCRService:
         
         Args:
             file_path: Path to the file to process
-            task_type: "default" or "structure"
+            task_type: "default", "structure", or "v1.5"
+            model: Model name override
             pages: List of page numbers to process (1-indexed)
             max_tokens: Override default max tokens
             temperature: Override default temperature
@@ -177,77 +303,22 @@ class TyphoonOCRService:
         else:
             target_pages = [1]
 
-        # Use provided params or defaults
-        _max_tokens = max_tokens or self.config.MAX_TOKENS
-        _temperature = temperature if temperature is not None else self.config.TEMPERATURE
-        _top_p = top_p if top_p is not None else self.config.TOP_P
-        _repetition_penalty = repetition_penalty if repetition_penalty is not None else self.config.REPETITION_PENALTY
-
         results: List[OcrPageResult] = []
         total_tokens = 0
 
         for page_num in target_pages:
-            try:
-                # Prepare OCR messages
-                messages = prepare_ocr_messages(
-                    file_path, 
-                    task_type, 
-                    self.config.IMAGE_DIM, 
-                    self.config.TEXT_LENGTH, 
-                    page_num
-                )
-                
-                # Extract image preview (Base64)
-                image_base64 = ""
-                try:
-                    img_url = messages[0]["content"][1]["image_url"]["url"]
-                    image_base64 = img_url.split(",")[-1] if "," in img_url else ""
-                except Exception:
-                    pass
-                
-                # API Call with Retry
-                response = self._call_api_with_retry(
-                    self.client.chat.completions.create,
-                    model=self.config.MODEL_NAME,
-                    messages=messages,
-                    max_tokens=_max_tokens,
-                    extra_body={
-                        "repetition_penalty": _repetition_penalty,
-                        "temperature": _temperature,
-                        "top_p": _top_p
-                    }
-                )
-                
-                # Parse response
-                content = response.choices[0].message.content
-                
-                # Track tokens
-                if hasattr(response, 'usage') and response.usage:
-                    total_tokens += response.usage.total_tokens
-                
-                # Try to parse JSON output
-                try:
-                    parsed = json.loads(content)
-                    text = parsed.get("natural_text", content)
-                except json.JSONDecodeError:
-                    text = content
-                
-                # Clean tags
-                text = text.replace("<figure>", "").replace("</figure>", "").strip()
-                
-                results.append(OcrPageResult(
-                    page=page_num,
-                    success=True,
-                    text=text,
-                    image_base64=image_base64
-                ))
-
-            except Exception as e:
-                results.append(OcrPageResult(
-                    page=page_num,
-                    success=False,
-                    error=str(e)
-                ))
+            page_result, token_count = self.process_single_page(
+                file_path=file_path,
+                page_num=page_num,
+                task_type=task_type,
+                model=model,
+                max_tokens=max_tokens,
+                temperature=temperature,
+                top_p=top_p,
+                repetition_penalty=repetition_penalty
+            )
+            results.append(page_result)
+            total_tokens += token_count
 
         processing_time = time.time() - start_time
         

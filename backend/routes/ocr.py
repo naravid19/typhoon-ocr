@@ -52,7 +52,7 @@ class ModelInfo(BaseModel):
 async def process_ocr(
     file: UploadFile = File(..., description="Image or PDF file to process"),
     model: str = Form(default="typhoon-ocr", description="Model to use"),
-    task_type: str = Form(default="default", description="Task type: default or structure"),
+    task_type: str = Form(default="default", description="Task type: default, structure, or v1.5"),
     max_tokens: int = Form(default=16384, description="Maximum tokens"),
     temperature: float = Form(default=0.1, description="Temperature (0.0-1.0)"),
     top_p: float = Form(default=0.6, description="Top P (0.0-1.0)"),
@@ -64,7 +64,7 @@ async def process_ocr(
     
     - **file**: PDF or image file (JPEG, PNG)
     - **model**: Model name (default: typhoon-ocr)
-    - **task_type**: 'default' or 'structure'
+    - **task_type**: 'default', 'structure', or 'v1.5'
     - **max_tokens**: Maximum tokens for response
     - **temperature**: Sampling temperature
     - **top_p**: Top-p sampling
@@ -115,6 +115,7 @@ async def process_ocr(
         result: OcrResult = service.process_document(
             file_path=temp_path,
             task_type=task_type,
+            model=model,
             pages=page_list,
             max_tokens=max_tokens,
             temperature=temperature,
@@ -188,7 +189,7 @@ async def get_page_count(
 async def process_ocr_stream(
     file: UploadFile = File(..., description="Image or PDF file to process"),
     model: str = Form(default="typhoon-ocr", description="Model to use"),
-    task_type: str = Form(default="default", description="Task type: default or structure"),
+    task_type: str = Form(default="default", description="Task type: default, structure, or v1.5"),
     max_tokens: int = Form(default=16384, description="Maximum tokens"),
     temperature: float = Form(default=0.1, description="Temperature (0.0-1.0)"),
     top_p: float = Form(default=0.6, description="Top P (0.0-1.0)"),
@@ -199,7 +200,7 @@ async def process_ocr_stream(
     Process a document with Typhoon OCR and stream progress via SSE.
     
     Events:
-    - {"type": "start", "total_pages": N}
+    - {"type": "start", "total_pages": N, "total": N}
     - {"type": "progress", "current": X, "total": N, "page": P}
     - {"type": "page_complete", "page": P, "success": bool, "text": "...", "error": null}
     - {"type": "complete", "success": bool, "total_tokens": N, "processing_time": T}
@@ -264,7 +265,7 @@ async def process_ocr_stream(
             total_targets = len(target_pages)
             
             # Send start event
-            yield f"data: {json.dumps({'type': 'start', 'total_pages': total_targets})}\n\n"
+            yield f"data: {json.dumps({'type': 'start', 'total_pages': total_targets, 'total': total_targets})}\n\n"
             
             # Process each page
             for idx, page_num in enumerate(target_pages, 1):
@@ -273,24 +274,23 @@ async def process_ocr_stream(
                 
                 # Process single page
                 # Run synchronous blocking call in threadpool to avoid blocking main event loop
-                page_result = await run_in_threadpool(
-                    service.process_document,
+                page_result, page_tokens = await run_in_threadpool(
+                    service.process_single_page,
                     file_path=temp_path,
+                    page_num=page_num,
                     task_type=task_type,
-                    pages=[page_num],
+                    model=model,
                     max_tokens=max_tokens,
                     temperature=temperature,
                     top_p=top_p,
                     repetition_penalty=repetition_penalty
                 )
-                
-                if page_result.results:
-                    r = page_result.results[0]
-                    results.append(r)
-                    total_tokens += page_result.total_tokens
-                    
-                    # Send page complete event
-                    yield f"data: {json.dumps({'type': 'page_complete', 'page': r.page, 'success': r.success, 'text': r.text[:200] + '...' if len(r.text) > 200 else r.text, 'image_base64': r.image_base64[:100] if r.image_base64 else '', 'error': r.error})}\n\n"
+
+                results.append(page_result)
+                total_tokens += page_tokens
+
+                # Send page complete event
+                yield f"data: {json.dumps({'type': 'page_complete', 'page': page_result.page, 'success': page_result.success, 'text': page_result.text[:200] + '...' if len(page_result.text) > 200 else page_result.text, 'image_base64': page_result.image_base64[:100] if page_result.image_base64 else '', 'error': page_result.error})}\n\n"
             
             processing_time = round(time.time() - start_time, 2)
             

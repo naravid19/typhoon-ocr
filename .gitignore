@@ -73,3 +73,10 @@ typhoon-ocr/
 *.tmp
 *.temp
 .cache/
+.agent/
+.shared/
+.cursorrules
+/backend/tests
+/backend/tests
+*.zip
+/poppler

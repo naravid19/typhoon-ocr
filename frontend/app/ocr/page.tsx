@@ -1,41 +1,58 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Navbar } from "@/components/Navbar";
 import { ConfigPanel } from "@/components/ConfigPanel";
 import { ResponsePanel } from "@/components/ResponsePanel";
+import { NotificationProvider, useNotificationContext } from "@/providers/NotificationProvider";
 import { OcrOptions, OcrResult } from "@/types/ocr";
 import { processOcrWithProgress, OcrProgress } from "@/lib/api";
 import { AlertCircle } from "lucide-react";
 
-export default function OcrPage() {
+function OcrPageContent() {
+  const [mounted, setMounted] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [result, setResult] = useState<OcrResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [numPages, setNumPages] = useState<number | null>(null);
+  const [, setNumPages] = useState<number | null>(null);
   
   // Real-time progress tracking
   const [currentPage, setCurrentPage] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
 
+  // Notification Context
+  const { 
+    notify, 
+    toast, 
+    hasPermission, 
+    requestPermission,
+    isSoundEnabled,
+    setSoundEnabled
+  } = useNotificationContext();
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const [options, setOptions] = useState<OcrOptions>({
     model: "typhoon-ocr",
-    task_type: "default",
+    task_type: "v1.5",
     max_tokens: 16384,
     temperature: 0.1,
     top_p: 0.6,
-    repetition_penalty: 1.2,
+    repetition_penalty: 1.1,
     pages: "",
   });
 
   const handleProgress = (progress: OcrProgress) => {
+    const total = progress.total_pages ?? progress.total ?? 0;
     if (progress.type === "start") {
-      setTotalPages(progress.total ?? 0);
+      setTotalPages(total);
       setCurrentPage(0);
     } else if (progress.type === "progress") {
       setCurrentPage(progress.current ?? 0);
-      setTotalPages(progress.total ?? 0);
+      setTotalPages(total);
     }
   };
 
@@ -52,20 +69,37 @@ export default function OcrPage() {
       const data = await processOcrWithProgress(file, options, handleProgress);
       if (data.success) {
         setResult(data);
+        
+        // Show success notifications
+        toast.success(
+          "✅ OCR สำเร็จ!",
+          `ประมวลผลเสร็จสิ้น ${data.results.length} หน้า ใช้เวลา ${data.processing_time.toFixed(2)} วินาที`
+        );
+        
+        // Browser notification (if permitted)
+        notify("✅ OCR สำเร็จ!", {
+          body: `ประมวลผลเสร็จสิ้น ${data.results.length} หน้า`,
+        });
       } else {
         setError(data.error || "Failed to process document");
+        toast.error("❌ เกิดข้อผิดพลาด", data.error || "ไม่สามารถประมวลผลเอกสารได้");
       }
     } catch (err: unknown) {
       const errorMessage =
         err instanceof Error ? err.message : "An error occurred";
       setError(errorMessage);
+      toast.error("❌ เกิดข้อผิดพลาด", errorMessage);
     } finally {
       setIsLoading(false);
     }
   };
 
+  if (!mounted) {
+    return <div suppressHydrationWarning className="h-screen bg-[#09090b]" />;
+  }
+
   return (
-    <div className="h-screen bg-[#09090b] flex flex-col font-sans overflow-hidden">
+    <div suppressHydrationWarning className="h-screen bg-[#09090b] flex flex-col font-sans overflow-hidden">
       <Navbar />
 
       <main className="flex-1 flex pt-16 overflow-hidden">
@@ -77,6 +111,10 @@ export default function OcrPage() {
           onSubmit={handleSubmit}
           isLoading={isLoading}
           onNumPagesChange={setNumPages}
+          notificationPermission={hasPermission}
+          onRequestNotificationPermission={requestPermission}
+          isSoundEnabled={isSoundEnabled}
+          onToggleSound={setSoundEnabled}
         />
 
         <div className="flex-1 flex flex-col h-full relative">
@@ -98,7 +136,6 @@ export default function OcrPage() {
             options={options}
             file={file}
             isLoading={isLoading}
-            numPages={numPages}
             currentPage={currentPage}
             totalPages={totalPages}
           />
@@ -108,3 +145,10 @@ export default function OcrPage() {
   );
 }
 
+export default function OcrPage() {
+  return (
+    <NotificationProvider>
+      <OcrPageContent />
+    </NotificationProvider>
+  );
+}

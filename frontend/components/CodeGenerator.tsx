@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Check, Copy, ChevronDown } from "lucide-react";
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
@@ -13,8 +13,13 @@ interface CodeGeneratorProps {
 }
 
 export function CodeGenerator({ options, file }: CodeGeneratorProps) {
+  const [mounted, setMounted] = useState(false);
   const [language, setLanguage] = useState("python");
   const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const code = useMemo(() => generateCode(language, file, options), [language, file, options]);
 
@@ -23,6 +28,10 @@ export function CodeGenerator({ options, file }: CodeGeneratorProps) {
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
+
+  if (!mounted) {
+    return <div className="h-[200px] border-t border-white/10 bg-[#0c0c0e]" />;
+  }
 
   return (
     <div className="border-t border-white/10 bg-[#0c0c0e]">

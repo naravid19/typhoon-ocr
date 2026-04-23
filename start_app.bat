@@ -34,13 +34,23 @@ echo   [0/3] Checking Dependencies...
 echo.
 
 REM Check Python
+set "PYTHON_CMD="
 where python >nul 2>&1
-if %ERRORLEVEL% neq 0 (
+if %ERRORLEVEL% equ 0 (
+    set "PYTHON_CMD=python"
+) else (
+    where py >nul 2>&1
+    if !ERRORLEVEL! equ 0 (
+        set "PYTHON_CMD=py"
+    )
+)
+
+if not defined PYTHON_CMD (
     echo   ❌ Python not found! Please install Python 3.10+
     echo      Download from: https://python.org
     goto :error_exit
 ) else (
-    for /f "tokens=2 delims= " %%v in ('python --version 2^>^&1') do set "PYTHON_VER=%%v"
+    for /f "tokens=2 delims= " %%v in ('!PYTHON_CMD! --version 2^>^&1') do set "PYTHON_VER=%%v"
     echo   ✓ Python !PYTHON_VER!
 )
 
@@ -121,6 +131,7 @@ goto :check_backend
 :venv_found
 echo   ✓ Virtual Environment: !VENV_NAME!
 set "VENV_CMD=call "%VENV_PATH%\Scripts\activate.bat""
+set "PYTHON_CMD=python"
 echo.
 
 REM ===================================================
@@ -149,9 +160,9 @@ if defined VENV_PATH (
 )
 
 REM Launch Backend in new window with colored title
-start "🔧 Typhoon OCR Backend" cmd /k "title 🔧 Typhoon OCR Backend && cd /d "%PROJECT_DIR%" && %VENV_CMD% && python -m uvicorn backend.main:app --reload --port 8000"
+start "🔧 Typhoon OCR Backend" cmd /k "title 🔧 Typhoon OCR Backend && cd /d "%PROJECT_DIR%" && %VENV_CMD% && %PYTHON_CMD% -m uvicorn backend.main:app --reload --port 8123"
 
-echo   ✓ Backend starting on http://localhost:8000
+echo   ✓ Backend starting on http://localhost:8123
 echo.
 
 REM ===================================================
@@ -201,9 +212,9 @@ echo.
 echo   ╔═══════════════════════════════════════════════════════╗
 echo   ║              ✨ All servers started! ✨               ║
 echo   ╠═══════════════════════════════════════════════════════╣
-echo   ║  🔧 Backend:   http://localhost:8000                  ║
+echo   ║  🔧 Backend:   http://localhost:8123                  ║
 echo   ║  🌐 Frontend:  http://localhost:3000                  ║
-echo   ║  📖 API Docs:  http://localhost:8000/docs             ║
+echo   ║  📖 API Docs:  http://localhost:8123/docs             ║
 echo   ╚═══════════════════════════════════════════════════════╝
 echo.
 echo   ┌───────────────────────────────────────────────────────┐

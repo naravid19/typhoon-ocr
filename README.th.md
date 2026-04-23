@@ -171,7 +171,7 @@ pdftoppm -v
    **Terminal 1 - Backend:**
 
    ```sh
-   python -m uvicorn backend.main:app --reload --port 8000
+   python -m uvicorn backend.main:app --reload --port 8123
    ```
 
    Terminal 2 - Frontend:
