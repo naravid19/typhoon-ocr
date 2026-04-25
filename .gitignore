@@ -1,4 +1,8 @@
-# ===== Python =====
+# ==============================================================================
+# Typhoon OCR - .gitignore for Public Repository
+# ==============================================================================
+
+# --- Python ---
 __pycache__/
 *.py[cod]
 *$py.class
@@ -19,31 +23,44 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+MANIFEST
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+.hypothesis/
+
+# --- Virtual Environments ---
 venv/
 .venv/
 ENV/
 env/
+ENV/
 
-# ===== Node.js =====
+# --- Node.js & Frontend ---
 node_modules/
+frontend/node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
-
-# ===== Next.js =====
+.eslintcache
 frontend/.next/
 frontend/out/
 
-# ===== Environment & Secrets =====
+# --- Environment & Secrets ---
 .env
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
 *.env
+*.key
+*.pem
+credentials.json
 
-# ===== IDE & Editors =====
+# --- IDE & Editors ---
 .vscode/
 .idea/
 *.swp
@@ -51,32 +68,44 @@ frontend/out/
 *~
 .DS_Store
 Thumbs.db
+desktop.ini
+.project
+.pydevproject
+.settings/
 
-# ===== Testing =====
-.coverage
-htmlcov/
-.tox/
-.nox/
-.pytest_cache/
-.hypothesis/
+# --- Large Binaries & Assets ---
+/poppler/
+*.zip
+*.tar.gz
+*.iso
 
-# ===== Logs =====
+# --- Logs & Temp Files ---
 *.log
+log.txt
 logs/
-
-# ===== Project Specific =====
-.specstory/
-raw_web/
-typhoon-ocr/
-
-# ===== Temp files =====
 *.tmp
 *.temp
 .cache/
+.npm
+.eslintcache
+
+# --- Project Specific (Private/Redundant) ---
 .agent/
 .shared/
 .cursorrules
+.specstory/
+raw_web/
+/typhoon-ocr/
+/findings.md
+/progress.md
+/task_plan.md
+
+# --- Media & Documents (Optional: Ignore test inputs/outputs) ---
+# Uncomment if you want to ignore all PDF/Images except for README assets
+# *.pdf
+# *.png
+# *.jpg
+# *.jpeg
+# !images/screenshot.png
+test_pdf_processing.py
 /backend/tests
-/backend/tests
-*.zip
-/poppler

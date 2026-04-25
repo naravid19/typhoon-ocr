@@ -171,7 +171,7 @@ pdftoppm -v
    **Terminal 1 - Backend:**
 
    ```sh
-   python -m uvicorn backend.main:app --reload --port 8123
+   python -m uvicorn backend.main:app --reload --port 8345
    ```
 
    Terminal 2 - Frontend:
@@ -210,6 +210,7 @@ pdftoppm -v
 - ✅ Shift-click for range selection
 - ✅ Quick actions: Select All, Odd/Even pages, Custom range
 - ✅ Two task types: `default` (Markdown) and `structure` (HTML tables)
+- ⚡ **Lightning Fast Asynchronous Backend** processing pages concurrently
 - ✅ Real-time progress indicator
 - ✅ Compare mode: Original image vs. extracted text
 - ✅ Copy extracted text with one click
@@ -226,6 +227,7 @@ pdftoppm -v
 - [x] URL import with proxy
 - [x] Progress indicators
 - [x] Compare view mode
+- [x] **Asynchronous/Concurrent OCR processing**
 - [ ] Batch processing
 - [ ] Export to Markdown/HTML file
 - [ ] Support for more document types

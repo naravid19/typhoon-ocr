@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.0.3] - 2026-04-25
+
+### Added
+- **Asynchronous Processing**: Refactored the entire backend OCR service to use `AsyncOpenAI` and `asyncio`, drastically improving performance and resource utilization.
+- **Parallel Page Execution**: Multi-page PDF documents are now processed concurrently using `asyncio.Semaphore`, vastly reducing total processing time.
+- **Smart Startup Validation**: `start_app.bat` now verifies `.env` configuration and detects Windows "Excluded Port Ranges" (Hyper-V) before launching.
+
+### Changed
+- **Port Migration (8345)**: Moved backend default port to **8345** to avoid frequent conflicts with Windows/Hyper-V reserved ranges (8123 was often blocked).
+- **Frontend Refactoring**: Improved React component structure, removing unused code and optimizing state management functional updates in the configuration panel.
+- **Stream API Optimization**: The SSE `/api/ocr/stream` endpoint now natively yields events from fully asynchronous background tasks.
+- **Enhanced Security**: Optimized `.gitignore` for public repository safety, ensuring secrets and large binaries are properly excluded.
+
+### Fixed
+- **WinError 10013**: Resolved "Access Forbidden" errors by migrating to a port outside of system-reserved ranges.
+- **Startup Script Crashes**: Fixed a parser bug in the `.bat` file caused by unescaped parentheses in output messages.
+
 ## [v1.0.2] - 2026-01-19
 
 ### Added

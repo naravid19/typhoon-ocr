@@ -171,7 +171,7 @@ pdftoppm -v
    **Terminal 1 - Backend:**
 
    ```sh
-   python -m uvicorn backend.main:app --reload --port 8123
+   python -m uvicorn backend.main:app --reload --port 8345
    ```
 
    Terminal 2 - Frontend:
@@ -210,6 +210,7 @@ pdftoppm -v
 - ✅ กด Shift+คลิกเพื่อเลือกช่วงหน้า
 - ✅ ปุ่มลัด: เลือกทั้งหมด, หน้าคี่/คู่, ช่วงกำหนดเอง
 - ✅ 2 โหมด: `default` (Markdown) และ `structure` (HTML tables)
+- ⚡ **ประมวลผลความเร็วสูง (Asynchronous)** ดึงข้อมูลหลายหน้าพร้อมกัน
 - ✅ แสดงความคืบหน้าแบบเรียลไทม์
 - ✅ โหมดเปรียบเทียบ: รูปต้นฉบับ vs. ข้อความที่แยกได้
 - ✅ คัดลอกข้อความด้วยคลิกเดียว
@@ -226,6 +227,7 @@ pdftoppm -v
 - [x] นำเข้าจาก URL พร้อม proxy
 - [x] แสดงความคืบหน้า
 - [x] โหมดเปรียบเทียบ
+- [x] **การประมวลผล OCR แบบขนาน (Asynchronous/Concurrent)**
 - [ ] ประมวลผลแบบ batch
 - [ ] ส่งออกเป็นไฟล์ Markdown/HTML
 - [ ] รองรับเอกสารประเภทอื่นเพิ่มเติม

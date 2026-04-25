@@ -75,10 +75,10 @@ export function ConfigPanel({
       setFile(acceptedFiles[0]);
       setNumPages(null); // Reset pages on new file
       // Reset page selection
-      setOptions({ ...options, pages: "" });
+      setOptions(prevOptions => ({ ...prevOptions, pages: "" }));
       setUrlError(null);
     }
-  }, [setFile, setOptions, options]);
+  }, [setFile, setOptions]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,

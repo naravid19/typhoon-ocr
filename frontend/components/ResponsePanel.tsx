@@ -21,19 +21,24 @@ interface ResponsePanelProps {
   isLoading: boolean;
   currentPage?: number;
   totalPages?: number;
+  statusMessage?: string | null;
 }
 
 // Separate component for the timer to reset state cleanly on mount/unmount
 function ProcessingTimer() {
   const [elapsedTime, setElapsedTime] = useState(0);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
     const startTime = Date.now();
     const interval = setInterval(() => {
       setElapsedTime(Math.floor((Date.now() - startTime) / 1000));
     }, 1000);
     return () => clearInterval(interval);
   }, []);
+
+  if (!mounted) return null;
 
   return (
     <div className="mt-6 flex items-center gap-2 px-4 py-2 rounded-full bg-zinc-900 border border-zinc-800">
@@ -45,15 +50,7 @@ function ProcessingTimer() {
   );
 }
 
-// Get progress message based on real page being processed
-const getProgressMessage = (currentPage: number, totalPages: number): string => {
-  if (totalPages > 0 && currentPage > 0) {
-    return `Processing page ${currentPage} of ${totalPages}`;
-  }
-  return "Starting OCR process...";
-};
-
-export function ResponsePanel({ result, options, file, isLoading, currentPage = 0, totalPages = 0 }: ResponsePanelProps) {
+export function ResponsePanel({ result, options, file, isLoading, currentPage = 0, totalPages = 0, statusMessage }: ResponsePanelProps) {
   const [copiedMode, setCopiedMode] = useState<"text" | "markdown" | null>(null);
   const [viewMode, setViewMode] = useState<"combined" | "compare">("combined");
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
@@ -179,11 +176,15 @@ export function ResponsePanel({ result, options, file, isLoading, currentPage = 
              </div>
              
              {/* Title */}
-             <h3 className="mt-8 text-xl font-semibold text-white">Processing Document</h3>
+             <h3 className="mt-8 text-xl font-semibold text-white">
+               {totalPages > 0 ? `Processing Page ${currentPage || 1} of ${totalPages}` : 'Processing Document'}
+             </h3>
              
-             {/* Real progress message */}
-             <p className="text-violet-400 mt-3 text-sm font-medium">
-               {getProgressMessage(currentPage, totalPages)}
+             {/* Real progress message from backend or fallback */}
+             <p className="text-violet-400 mt-2 text-sm font-medium">
+               {statusMessage || (totalPages > 0 
+                 ? `Working on page ${currentPage || 1}...` 
+                 : "Analyzing document structure...")}
              </p>
              
              {/* Model info */}
@@ -195,23 +196,27 @@ export function ResponsePanel({ result, options, file, isLoading, currentPage = 
              <ProcessingTimer />
              
              {/* Real progress bar */}
-             <div className="mt-6 w-64">
-               <div className="flex justify-between text-xs text-zinc-500 mb-1">
-                 <span>Progress</span>
-                 <span>{totalPages > 0 ? Math.round((currentPage / totalPages) * 100) : 0}%</span>
+             <div className="mt-8 w-72">
+               <div className="flex justify-between text-xs text-zinc-500 mb-2">
+                 <span className="font-medium text-zinc-400">
+                   {totalPages > 0 ? `${currentPage} / ${totalPages} pages` : 'Initializing...'}
+                 </span>
+                 <span className="text-violet-400 font-bold">
+                   {totalPages > 0 ? Math.round((currentPage / totalPages) * 100) : 0}%
+                 </span>
                </div>
-               <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
+               <div className="h-2.5 bg-zinc-800/50 rounded-full overflow-hidden border border-white/5">
                  <div 
-                   className="h-full bg-linear-to-r from-violet-600 to-violet-400 rounded-full transition-all duration-500 ease-out"
-                   style={{ width: totalPages > 0 ? `${(currentPage / totalPages) * 100}%` : '0%' }}
+                   className="h-full bg-linear-to-r from-violet-600 via-violet-500 to-violet-400 rounded-full transition-all duration-700 ease-out shadow-[0_0_12px_rgba(139,92,246,0.3)]"
+                   style={{ width: totalPages > 0 ? `${Math.max(2, (currentPage / totalPages) * 100)}%` : '0%' }}
                  />
                </div>
              </div>
              
-             {/* Page indicator */}
+             {/* Detail status */}
              {totalPages > 1 && (
-               <p className="text-zinc-600 mt-3 text-xs">
-                 {currentPage} / {totalPages} pages completed
+               <p className="text-zinc-500 mt-4 text-[11px] uppercase tracking-widest font-medium">
+                 {currentPage < totalPages ? 'Please wait while we digitize your pages' : 'Finalizing results...'}
                </p>
              )}
            </div>

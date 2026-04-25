@@ -20,6 +20,7 @@ function OcrPageContent() {
   // Real-time progress tracking
   const [currentPage, setCurrentPage] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
   // Notification Context
   const { 
@@ -47,12 +48,21 @@ function OcrPageContent() {
 
   const handleProgress = (progress: OcrProgress) => {
     const total = progress.total_pages ?? progress.total ?? 0;
+    
+    if (progress.message) {
+      setStatusMessage(progress.message);
+    }
+
     if (progress.type === "start") {
       setTotalPages(total);
       setCurrentPage(0);
+      setStatusMessage("Document analysis complete. Starting OCR...");
     } else if (progress.type === "progress") {
       setCurrentPage(progress.current ?? 0);
       setTotalPages(total);
+      if (progress.page) {
+        setStatusMessage(`Processing page ${progress.page}...`);
+      }
     }
   };
 
@@ -64,6 +74,7 @@ function OcrPageContent() {
     setResult(null);
     setCurrentPage(0);
     setTotalPages(0);
+    setStatusMessage("Uploading and connecting...");
 
     try {
       const data = await processOcrWithProgress(file, options, handleProgress);
@@ -138,6 +149,7 @@ function OcrPageContent() {
             isLoading={isLoading}
             currentPage={currentPage}
             totalPages={totalPages}
+            statusMessage={statusMessage}
           />
         </div>
       </main>

@@ -3,24 +3,22 @@ OCR Service Module
 ==================
 
 Core OCR processing logic extracted from the original Gradio app.
-Handles document processing, API calls, and result formatting.
+Handles document processing, API calls, and result formatting using asynchronous operations.
 """
 
+import asyncio
 import base64
 import json
 import os
 import re
 import subprocess
-import sys
 import time
 from dataclasses import dataclass, field
-from io import BytesIO
 from pathlib import Path
 from typing import Any, Callable, List, Optional, Tuple
 
 from dotenv import load_dotenv
-from openai import APIConnectionError, APITimeoutError, OpenAI
-from PIL import Image
+from openai import APIConnectionError, APITimeoutError, AsyncOpenAI
 from pypdf import PdfReader
 
 import typhoon_ocr.ocr_utils
@@ -32,7 +30,7 @@ load_dotenv()
 @dataclass
 class Config:
     """Application configuration and model parameters."""
-    BASE_URL: str = field(default_factory=lambda: os.getenv("TYPHOON_BASE_URL", ""))
+    BASE_URL: str = field(default_factory=lambda: os.getenv("TYPHOON_BASE_URL", "https://api.opentyphoon.ai/v1"))
     API_KEY: str = field(default_factory=lambda: os.getenv("TYPHOON_API_KEY", ""))
     MODEL_NAME: str = field(default_factory=lambda: os.getenv("TYPHOON_OCR_MODEL", "typhoon-ocr"))
     MAX_TOKENS: int = 16384
@@ -73,14 +71,20 @@ def _apply_windows_patches() -> None:
             "pdfinfo", "-f", str(page_num), "-l", str(page_num), "-box",
             "-enc", "UTF-8", local_pdf_path
         ]
-        result = subprocess.run(
-            command, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-            text=True, encoding='utf-8', errors='replace'
-        )
-        
+        try:
+            result = subprocess.run(
+                command, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                text=True, encoding='utf-8', errors='replace',
+                timeout=30  # Add timeout to prevent hanging
+            )
+        except subprocess.TimeoutExpired:
+            raise ValueError(f"pdfinfo timed out after 30 seconds for {local_pdf_path}")
+        except FileNotFoundError:
+            raise ValueError("pdfinfo utility not found. Please ensure Poppler is installed and in PATH.")
+
         if result.returncode != 0:
             raise ValueError(f"Error running pdfinfo: {result.stderr}")
-            
+
         for line in result.stdout.splitlines():
             if "MediaBox" in line:
                 try:
@@ -101,12 +105,12 @@ _apply_windows_patches()
 
 
 class TyphoonOCRService:
-    """Core OCR service for processing documents."""
+    """Core OCR service for processing documents asynchronously."""
 
     def __init__(self, config: Optional[Config] = None):
         self.config = config or Config()
-        self.client = OpenAI(
-            base_url=self.config.BASE_URL, 
+        self.client = AsyncOpenAI(
+            base_url=self.config.BASE_URL,
             api_key=self.config.API_KEY
         )
 
@@ -119,20 +123,20 @@ class TyphoonOCRService:
             pass
         return 1
 
-    def _call_api_with_retry(self, func: Callable, *args, **kwargs) -> Any:
+    async def _call_api_with_retry(self, func: Callable, *args, **kwargs) -> Any:
         """
-        Executes a function with exponential backoff retry logic.
+        Executes an async function with exponential backoff retry logic.
         """
         for attempt in range(self.config.MAX_RETRIES):
             try:
-                return func(*args, **kwargs)
+                return await func(*args, **kwargs)
             except (APIConnectionError, APITimeoutError) as e:
                 if attempt == self.config.MAX_RETRIES - 1:
                     raise e
-                time.sleep(2 ** attempt)
+                await asyncio.sleep(2 ** attempt)
             except Exception as e:
                 raise e
-    
+
     def _resolve_model_name(self, model: Optional[str]) -> str:
         """Resolve model name from request value or environment fallback."""
         candidate = (model or "").strip()
@@ -153,11 +157,6 @@ class TyphoonOCRService:
     def _parse_response_text(content: Any) -> str:
         """
         Parse model output into final text.
-
-        Supports:
-        - Plain JSON: {"natural_text": "..."}
-        - Fenced JSON blocks
-        - Raw markdown/text fallback
         """
         if content is None:
             return ""
@@ -190,7 +189,7 @@ class TyphoonOCRService:
 
         return parsed_text.replace("<figure>", "").replace("</figure>", "").strip()
 
-    def process_single_page(
+    async def process_single_page(
         self,
         file_path: str,
         page_num: int,
@@ -202,7 +201,7 @@ class TyphoonOCRService:
         repetition_penalty: Optional[float] = None,
     ) -> Tuple[OcrPageResult, int]:
         """
-        Process a single page and return page result with token usage.
+        Process a single page asynchronously and return page result with token usage.
         """
         _max_tokens = max_tokens or self.config.MAX_TOKENS
         _temperature = temperature if temperature is not None else self.config.TEMPERATURE
@@ -211,7 +210,9 @@ class TyphoonOCRService:
         resolved_model = self._resolve_model_name(model)
 
         try:
-            messages = prepare_ocr_messages(
+            # File reading and image processing is CPU bound, offload to thread pool
+            messages = await asyncio.to_thread(
+                prepare_ocr_messages,
                 file_path,
                 task_type,
                 self.config.IMAGE_DIM,
@@ -221,7 +222,7 @@ class TyphoonOCRService:
 
             image_base64 = self._extract_image_base64(messages)
 
-            response = self._call_api_with_retry(
+            response = await self._call_api_with_retry(
                 self.client.chat.completions.create,
                 model=resolved_model,
                 messages=messages,
@@ -260,7 +261,7 @@ class TyphoonOCRService:
                 0
             )
 
-    def process_document(
+    async def process_document(
         self,
         file_path: str,
         task_type: str = "default",
@@ -272,30 +273,17 @@ class TyphoonOCRService:
         repetition_penalty: Optional[float] = None,
     ) -> OcrResult:
         """
-        Main processing function for OCR.
-        
-        Args:
-            file_path: Path to the file to process
-            task_type: "default", "structure", or "v1.5"
-            model: Model name override
-            pages: List of page numbers to process (1-indexed)
-            max_tokens: Override default max tokens
-            temperature: Override default temperature
-            top_p: Override default top_p
-            repetition_penalty: Override default repetition penalty
-            
-        Returns:
-            OcrResult with processing results
+        Main processing function for OCR, running page tasks concurrently.
         """
         start_time = time.time()
-        
+
         if not file_path or not os.path.exists(file_path):
             return OcrResult(success=False, error="File not found")
 
         is_pdf = file_path.lower().endswith(".pdf")
-        total_pages = self.get_page_count(file_path)
+        # get_page_count is fast enough to keep sync, but could be offloaded
+        total_pages = await asyncio.to_thread(self.get_page_count, file_path)
 
-        # Determine target pages
         if pages:
             target_pages = [p for p in pages if 1 <= p <= total_pages]
         elif is_pdf:
@@ -306,22 +294,30 @@ class TyphoonOCRService:
         results: List[OcrPageResult] = []
         total_tokens = 0
 
-        for page_num in target_pages:
-            page_result, token_count = self.process_single_page(
-                file_path=file_path,
-                page_num=page_num,
-                task_type=task_type,
-                model=model,
-                max_tokens=max_tokens,
-                temperature=temperature,
-                top_p=top_p,
-                repetition_penalty=repetition_penalty
-            )
+        semaphore = asyncio.Semaphore(5)
+
+        async def _process_page(page_num):
+            async with semaphore:
+                return await self.process_single_page(
+                    file_path=file_path,
+                    page_num=page_num,
+                    task_type=task_type,
+                    model=model,
+                    max_tokens=max_tokens,
+                    temperature=temperature,
+                    top_p=top_p,
+                    repetition_penalty=repetition_penalty
+                )
+
+        tasks = [asyncio.create_task(_process_page(p)) for p in target_pages]
+        completed_tasks = await asyncio.gather(*tasks)
+
+        for page_result, token_count in completed_tasks:
             results.append(page_result)
             total_tokens += token_count
 
         processing_time = time.time() - start_time
-        
+
         return OcrResult(
             success=all(r.success for r in results),
             results=results,

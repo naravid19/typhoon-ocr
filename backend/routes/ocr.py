@@ -112,7 +112,7 @@ async def process_ocr(
         
         # Process with OCR service
         service = get_ocr_service()
-        result: OcrResult = service.process_document(
+        result: OcrResult = await service.process_document(
             file_path=temp_path,
             task_type=task_type,
             model=model,
@@ -249,10 +249,17 @@ async def process_ocr_stream(
         total_tokens = 0
         results = []
         
+        # 1. Send massive padding and a "connecting" signal IMMEDIATELY
+        # Increase padding to 4KB for even better buffer flushing
+        padding = ":" + " " * 4096 + "\n\n"
+        yield padding
+        yield f"data: {json.dumps({'type': 'progress', 'current': 0, 'total': 0, 'message': 'Establishing connection...'})}\n\n"
+        
         try:
-            # Get page count
+            # 2. Get page count (This might take a moment)
+            import asyncio
             is_pdf = temp_path.lower().endswith(".pdf")
-            total_pages_in_doc = service.get_page_count(temp_path)
+            total_pages_in_doc = await asyncio.to_thread(service.get_page_count, temp_path)
             
             # Determine target pages
             if page_list:
@@ -264,28 +271,33 @@ async def process_ocr_stream(
             
             total_targets = len(target_pages)
             
-            # Send start event
+            # 3. Send the official START event
             yield f"data: {json.dumps({'type': 'start', 'total_pages': total_targets, 'total': total_targets})}\n\n"
             
-            # Process each page
-            for idx, page_num in enumerate(target_pages, 1):
-                # Send progress event
-                yield f"data: {json.dumps({'type': 'progress', 'current': idx, 'total': total_targets, 'page': page_num})}\n\n"
-                
-                # Process single page
-                # Run synchronous blocking call in threadpool to avoid blocking main event loop
-                page_result, page_tokens = await run_in_threadpool(
-                    service.process_single_page,
-                    file_path=temp_path,
-                    page_num=page_num,
-                    task_type=task_type,
-                    model=model,
-                    max_tokens=max_tokens,
-                    temperature=temperature,
-                    top_p=top_p,
-                    repetition_penalty=repetition_penalty
-                )
+            semaphore = asyncio.Semaphore(5)
+            
+            async def process_page_with_semaphore(p_num):
+                async with semaphore:
+                    return await service.process_single_page(
+                        file_path=temp_path,
+                        page_num=p_num,
+                        task_type=task_type,
+                        model=model,
+                        max_tokens=max_tokens,
+                        temperature=temperature,
+                        top_p=top_p,
+                        repetition_penalty=repetition_penalty
+                    )
 
+            # Queue all tasks for concurrent processing
+            tasks = [asyncio.create_task(process_page_with_semaphore(p)) for p in target_pages]
+            
+            # Process results in order
+            for idx, task in enumerate(tasks, 1):
+                # Send progress event for UI update (even though it's processing in parallel)
+                yield f"data: {json.dumps({'type': 'progress', 'current': idx, 'total': total_targets, 'page': target_pages[idx-1]})}\n\n"
+                
+                page_result, page_tokens = await task
                 results.append(page_result)
                 total_tokens += page_tokens
 
