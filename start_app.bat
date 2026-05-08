@@ -97,7 +97,7 @@ if !ERRORLEVEL! neq 0 (
 REM Check dependencies and install if missing
 echo   Checking backend dependencies...
 if defined VENV_PATH (
-    "!VENV_PATH!\Scripts\python.exe" -c "import fastapi, uvicorn, openai" >nul 2>&1
+    "!VENV_PATH!\Scripts\python.exe" -c "import fastapi, uvicorn, openai, typhoon_ocr" >nul 2>&1
     if !ERRORLEVEL! neq 0 (
         echo   [!] Missing dependencies, installing...
         call "!VENV_PATH!\Scripts\activate.bat" && pip install -r requirements.txt -r backend/requirements.txt -q

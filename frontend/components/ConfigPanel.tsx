@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, Dispatch, SetStateAction } from "react";
 import dynamic from 'next/dynamic';
 import { useDropzone } from "react-dropzone";
 import { Upload, X, FileText, Settings, ChevronRight, Link as LinkIcon, Image as ImageIcon, Loader2 } from "lucide-react";
@@ -17,7 +17,7 @@ const PdfPreview = dynamic(() => import('./PdfPreview'), {
 
 interface ConfigPanelProps {
   options: OcrOptions;
-  setOptions: (options: OcrOptions) => void;
+  setOptions: Dispatch<SetStateAction<OcrOptions>>;
   file: File | null;
   setFile: (file: File | null) => void;
   onSubmit: () => void;
@@ -57,10 +57,10 @@ export function ConfigPanel({
   useEffect(() => {
     if (file && !file.name.endsWith('.pdf') && file.type.startsWith('image/')) {
       const url = URL.createObjectURL(file);
-      setPreviewUrl(url);
+      setTimeout(() => setPreviewUrl(url), 0);
       return () => URL.revokeObjectURL(url);
     } else {
-      setPreviewUrl(null);
+      setTimeout(() => setPreviewUrl(null), 0);
     }
   }, [file]);
 

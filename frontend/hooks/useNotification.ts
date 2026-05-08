@@ -65,7 +65,7 @@ export function useNotification(): UseNotificationReturn {
   useEffect(() => {
     // Set initial permission after hydration to prevent mismatch
     if (isSupported) {
-      setPermission(Notification.permission);
+      setTimeout(() => setPermission(Notification.permission), 0);
     }
 
     // Preload audio (disabled since /notification.mp3 is missing)
@@ -79,7 +79,7 @@ export function useNotification(): UseNotificationReturn {
         audioRef.current = null;
       }
     };
-  }, []);
+  }, [isSupported]);
 
   /**
    * Request notification permission from user

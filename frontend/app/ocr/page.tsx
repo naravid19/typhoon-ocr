@@ -33,7 +33,7 @@ function OcrPageContent() {
   } = useNotificationContext();
 
   useEffect(() => {
-    setMounted(true);
+    setTimeout(() => setMounted(true), 0);
   }, []);
 
   const [options, setOptions] = useState<OcrOptions>({

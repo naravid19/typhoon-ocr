@@ -18,7 +18,7 @@ export function CodeGenerator({ options, file }: CodeGeneratorProps) {
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    setMounted(true);
+    setTimeout(() => setMounted(true), 0);
   }, []);
 
   const code = useMemo(() => generateCode(language, file, options), [language, file, options]);
