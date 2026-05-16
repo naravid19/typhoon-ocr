@@ -297,7 +297,16 @@ async def process_ocr_stream(
                 # Send progress event for UI update (even though it's processing in parallel)
                 yield f"data: {json.dumps({'type': 'progress', 'current': idx, 'total': total_targets, 'page': target_pages[idx-1]})}\n\n"
                 
-                page_result, page_tokens = await task
+                import asyncio
+                # Wait for the task to complete, sending keep-alive pings every 5 seconds
+                while not task.done():
+                    try:
+                        await asyncio.wait_for(asyncio.shield(task), timeout=5.0)
+                    except asyncio.TimeoutError:
+                        yield f": keep-alive\n\n"
+                        continue
+                
+                page_result, page_tokens = task.result()
                 results.append(page_result)
                 total_tokens += page_tokens
 
@@ -318,7 +327,10 @@ async def process_ocr_stream(
                 for r in results
             ]
             
-            yield f"data: {json.dumps({'type': 'complete', 'success': all(r.success for r in results), 'results': final_results, 'total_tokens': total_tokens, 'processing_time': processing_time})}\n\n"
+            error_msgs = [f"Page {r.page}: {r.error}" for r in results if not r.success]
+            overall_error = " | ".join(error_msgs) if error_msgs else None
+            
+            yield f"data: {json.dumps({'type': 'complete', 'success': all(r.success for r in results), 'results': final_results, 'total_tokens': total_tokens, 'processing_time': processing_time, 'error': overall_error})}\n\n"
             
         except Exception as e:
             yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"

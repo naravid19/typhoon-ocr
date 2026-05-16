@@ -111,7 +111,9 @@ class TyphoonOCRService:
         self.config = config or Config()
         self.client = AsyncOpenAI(
             base_url=self.config.BASE_URL,
-            api_key=self.config.API_KEY
+            api_key=self.config.API_KEY,
+            timeout=300.0,
+            max_retries=2
         )
 
     def get_page_count(self, file_path: str) -> int:
