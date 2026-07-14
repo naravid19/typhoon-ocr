@@ -20,7 +20,7 @@ from typing import List, Tuple, Any, Optional, Callable
 
 import gradio as gr
 from dotenv import load_dotenv
-from openai import OpenAI, APIConnectionError, APITimeoutError
+from openai import OpenAI, APIConnectionError, APITimeoutError, APIStatusError
 from PIL import Image
 from pypdf import PdfReader
 import typhoon_ocr.ocr_utils
@@ -492,6 +492,13 @@ class TyphoonOCR:
                 if attempt == Config.MAX_RETRIES - 1:
                     raise e
                 time.sleep(2 ** attempt)
+            except APIStatusError as e:
+                if e.status_code in [408, 429, 500, 502, 503, 504]:
+                    if attempt == Config.MAX_RETRIES - 1:
+                        raise e
+                    time.sleep(2 ** attempt)
+                else:
+                    raise e
             except Exception as e:
                 raise e
 
