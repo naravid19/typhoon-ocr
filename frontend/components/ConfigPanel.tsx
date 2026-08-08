@@ -1,28 +1,48 @@
-"use client";
-
+import dynamic from "next/dynamic";
 import { useState, useCallback, useEffect, Dispatch, SetStateAction } from "react";
-import dynamic from 'next/dynamic';
 import { useDropzone } from "react-dropzone";
-import { Upload, X, FileText, Settings, ChevronRight, Link as LinkIcon, Image as ImageIcon, Loader2 } from "lucide-react";
+import { Upload, X, FileText, Settings, ChevronRight, ChevronDown, ChevronUp, Link as LinkIcon, Loader2, FileCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { OcrOptions } from "@/types/ocr";
+import { OcrOptions, FileSlot } from "@/types/ocr";
+
+const PdfPreviewDynamic = dynamic(() => import("./PdfPreview"), {
+  ssr: false,
+  loading: () => <div className="h-28 bg-zinc-900 animate-pulse rounded-lg border border-zinc-800 flex items-center justify-center text-xs text-zinc-500">Loading PDF Page Selector...</div>,
+});
 
 const LEGACY_DEFAULT_REPETITION_PENALTY = 1.2;
 const V15_REPETITION_PENALTY = 1.1;
+const MAX_FILES = 10;
 
-const PdfPreview = dynamic(() => import('./PdfPreview'), { 
-  ssr: false,
-  loading: () => <div className="h-40 flex items-center justify-center text-xs text-zinc-500">Loading PDF Preview...</div>
-});
+function getSlotStatusIcon(slot: FileSlot) {
+  if (slot.isLoading) {
+    return <div className="w-4 h-4 border-2 border-violet-500/30 border-t-violet-500 rounded-full animate-spin" />;
+  }
+  if (slot.error) {
+    return <span className="text-red-400 text-sm font-bold">✕</span>;
+  }
+  if (slot.result) {
+    return <span className="text-green-400 text-sm font-bold">✓</span>;
+  }
+  return <span className="text-zinc-600 text-sm">○</span>;
+}
+
+function getSlotStatusText(slot: FileSlot): string {
+  if (slot.isLoading) return "processing";
+  if (slot.error) return "error";
+  if (slot.result) return "done";
+  return "pending";
+}
 
 interface ConfigPanelProps {
   options: OcrOptions;
   setOptions: Dispatch<SetStateAction<OcrOptions>>;
-  file: File | null;
-  setFile: (file: File | null) => void;
+  slots: FileSlot[];
+  setSlots: Dispatch<SetStateAction<FileSlot[]>>;
+  onRemoveSlot?: (id: string) => void;
+  onClearSlots?: () => void;
   onSubmit: () => void;
   isLoading: boolean;
-  onNumPagesChange?: (numPages: number | null) => void;
   /** Whether browser notification permission is granted */
   notificationPermission?: boolean;
   /** Callback to request notification permission */
@@ -36,11 +56,12 @@ interface ConfigPanelProps {
 export function ConfigPanel({
   options,
   setOptions,
-  file,
-  setFile,
+  slots,
+  setSlots,
+  onRemoveSlot,
+  onClearSlots,
   onSubmit,
   isLoading,
-  onNumPagesChange,
   notificationPermission,
   onRequestNotificationPermission,
   isSoundEnabled = true,
@@ -48,37 +69,52 @@ export function ConfigPanel({
 }: ConfigPanelProps) {
   const [activeTab, setActiveTab] = useState<"files" | "params">("files");
   const [urlInput, setUrlInput] = useState("");
-  const [numPages, setNumPages] = useState<number | null>(null);
   const [isLoadingUrl, setIsLoadingUrl] = useState(false);
   const [urlError, setUrlError] = useState<string | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [showPageSelector, setShowPageSelector] = useState(true);
 
-  // Handle image preview URL
+  const isSinglePdf = slots.length === 1 && (
+    slots[0].file.type === "application/pdf" || 
+    slots[0].file.name.toLowerCase().endsWith(".pdf")
+  );
+
+  // Auto-expand page selector when exactly 1 PDF is present
   useEffect(() => {
-    if (file && !file.name.endsWith('.pdf') && file.type.startsWith('image/')) {
-      const url = URL.createObjectURL(file);
-      setTimeout(() => setPreviewUrl(url), 0);
-      return () => URL.revokeObjectURL(url);
+    if (isSinglePdf) {
+      setShowPageSelector(true);
     } else {
-      setTimeout(() => setPreviewUrl(null), 0);
+      setShowPageSelector(false);
     }
-  }, [file]);
+  }, [isSinglePdf, slots.length]);
 
-  // Notify parent of page count changes
-  const handleNumPagesChange = (pages: number) => {
-    setNumPages(pages);
-    onNumPagesChange?.(pages);
-  };
+  // Clear global pages selection when switching to multi-file mode
+  useEffect(() => {
+    if (slots.length > 1) {
+      setOptions((prev) => (prev.pages ? { ...prev, pages: "" } : prev));
+    }
+  }, [slots.length, setOptions]);
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
-    if (acceptedFiles.length > 0) {
-      setFile(acceptedFiles[0]);
-      setNumPages(null); // Reset pages on new file
-      // Reset page selection
-      setOptions(prevOptions => ({ ...prevOptions, pages: "" }));
-      setUrlError(null);
+    setUrlError(null);
+    const remaining = MAX_FILES - slots.length;
+    if (remaining <= 0) return;
+    const toAdd = acceptedFiles.slice(0, remaining);
+    if (acceptedFiles.length > remaining) {
+      alert(`รับสูงสุด ${MAX_FILES} ไฟล์ — เพิ่ม ${toAdd.length} ไฟล์แรกเท่านั้น`);
     }
-  }, [setFile, setOptions]);
+    const newSlots: FileSlot[] = toAdd.map((f) => ({
+      id: crypto.randomUUID(),
+      file: f,
+      result: null,
+      isLoading: false,
+      error: null,
+      currentPage: 0,
+      totalPages: 0,
+      statusMessage: null,
+    }));
+    setSlots((prev) => [...prev, ...newSlots]);
+    setOptions((prev) => ({ ...prev, pages: "" }));
+  }, [slots.length, setSlots, setOptions]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -86,8 +122,8 @@ export function ConfigPanel({
       'image/*': ['.png', '.jpg', '.jpeg', '.webp'],
       'application/pdf': ['.pdf']
     },
-    maxFiles: 1,
-    multiple: false
+    maxFiles: MAX_FILES,
+    multiple: true
   });
 
   const handleChange = (key: keyof OcrOptions, value: string | number) => {
@@ -97,7 +133,6 @@ export function ConfigPanel({
   const handleTaskTypeChange = (taskType: OcrOptions["task_type"]) => {
     const nextOptions: OcrOptions = { ...options, task_type: taskType };
 
-    // Auto-suggest the v1.5 repetition penalty only when still using legacy default.
     if (taskType === "v1.5" && options.repetition_penalty === LEGACY_DEFAULT_REPETITION_PENALTY) {
       nextOptions.repetition_penalty = V15_REPETITION_PENALTY;
     }
@@ -107,12 +142,16 @@ export function ConfigPanel({
 
   const handleLoadUrl = async () => {
     if (!urlInput.trim()) return;
-    
+
+    if (slots.length >= MAX_FILES) {
+      setUrlError(`รับสูงสุด ${MAX_FILES} ไฟล์ — กรุณาลบไฟล์เก่าออกก่อน`);
+      return;
+    }
+
     setIsLoadingUrl(true);
     setUrlError(null);
     
     try {
-      // Fetch the file using our proxy API to avoid CORS issues
       const response = await fetch('/api/proxy', {
         method: 'POST',
         headers: {
@@ -122,7 +161,6 @@ export function ConfigPanel({
       });
       
       if (!response.ok) {
-        // Try to get error message from response
         let errorMessage = `Failed to fetch: ${response.status} ${response.statusText}`;
         try {
           const errorData = await response.json();
@@ -133,28 +171,33 @@ export function ConfigPanel({
       }
       
       const blob = await response.blob();
-      
-      // Get filename from header or fallback to URL
       const filenameHeader = response.headers.get('X-Filename');
       const filename = filenameHeader || new URL(urlInput).pathname.split('/').pop() || 'document.pdf';
       
-      // Determine MIME type
       let mimeType = blob.type;
       if (!mimeType || mimeType === 'application/octet-stream') {
-        // Infer from extension
         if (filename.endsWith('.pdf')) mimeType = 'application/pdf';
         else if (filename.endsWith('.png')) mimeType = 'image/png';
         else if (filename.endsWith('.jpg') || filename.endsWith('.jpeg')) mimeType = 'image/jpeg';
         else if (filename.endsWith('.webp')) mimeType = 'image/webp';
       }
       
+      const loadedFile = new File([blob], filename, { type: mimeType });
       
-      // Create a File object from the blob
-      const file = new File([blob], filename, { type: mimeType });
-      
-      setFile(file);
-      setNumPages(null);
-      setOptions({ ...options, pages: "" });
+      setSlots((prev) => [
+        ...prev,
+        {
+          id: crypto.randomUUID(),
+          file: loadedFile,
+          result: null,
+          isLoading: false,
+          error: null,
+          currentPage: 0,
+          totalPages: 0,
+          statusMessage: null,
+        },
+      ]);
+      setOptions((prev) => ({ ...prev, pages: "" }));
       setUrlInput("");
       
     } catch (error) {
@@ -177,7 +220,6 @@ export function ConfigPanel({
             onChange={(e) => handleChange("model", e.target.value)}
           >
             <option value="typhoon-ocr">Typhoon OCR (Default)</option>
-            {/* <option value="typhoon-ocr-v2">Typhoon OCR v2 (Beta)</option> */}
           </select>
           <ChevronRight className="absolute right-3 top-3 text-zinc-500 rotate-90 pointer-events-none" size={16} />
         </div>
@@ -188,7 +230,7 @@ export function ConfigPanel({
         <button
           onClick={() => setActiveTab("files")}
           className={cn(
-            "flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors",
+            "flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors cursor-pointer",
             activeTab === "files" 
               ? "text-white border-violet-500" 
               : "text-zinc-500 border-transparent hover:text-zinc-300"
@@ -200,7 +242,7 @@ export function ConfigPanel({
         <button
           onClick={() => setActiveTab("params")}
           className={cn(
-            "flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors",
+            "flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors cursor-pointer",
             activeTab === "params" 
               ? "text-white border-violet-500" 
               : "text-zinc-500 border-transparent hover:text-zinc-300"
@@ -215,82 +257,124 @@ export function ConfigPanel({
       <div className="flex-1 overflow-y-auto p-6 scrollbar-thin scrollbar-thumb-zinc-800">
         
         {activeTab === "files" ? (
-          <div className="space-y-6">
+          <div className="space-y-4">
+            {/* Dropzone */}
             <div 
               {...getRootProps()} 
               className={cn(
-                "border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-all",
+                "border-2 border-dashed rounded-xl p-5 text-center cursor-pointer transition-all",
                 isDragActive ? "border-violet-500 bg-violet-500/10" : "border-zinc-800 hover:border-zinc-700 hover:bg-zinc-900/50",
-                !file && "min-h-[150px] flex flex-col items-center justify-center" // Taller if empty
+                slots.length === 0 && "min-h-[130px] flex flex-col items-center justify-center"
               )}
             >
               <input {...getInputProps()} />
-              {!file ? (
-                <>
-                  <div className="w-10 h-10 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center mb-3">
-                    <Upload className="text-zinc-400" size={18} />
-                  </div>
-                  <p className="text-sm text-zinc-300 font-medium">Click to upload</p>
-                  <p className="text-xs text-zinc-500 mt-1">PDF, JPG, PNG</p>
-                </>
-              ) : (
-                <div className="flex items-center justify-between bg-zinc-900/50 p-2 rounded-lg border border-zinc-800">
-                    <div className="flex items-center gap-3 overflow-hidden">
-                        <div className="w-8 h-8 rounded bg-violet-500/20 flex items-center justify-center text-violet-400 shrink-0">
-                           {file.name.endsWith('.pdf') ? <FileText size={16} /> : <ImageIcon size={16} />}
-                        </div>
-                        <div className="text-left overflow-hidden">
-                           <p className="text-xs font-medium text-white truncate">{file.name}</p>
-                           <p className="text-[10px] text-zinc-500">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
-                        </div>
-                    </div>
-                    <button 
-                        onClick={(e) => { e.stopPropagation(); setFile(null); setNumPages(null); }}
-                        className="p-1.5 hover:bg-red-500/10 text-zinc-400 hover:text-red-400 rounded-md transition-colors"
-                    >
-                        <X size={14} />
-                    </button>
-                </div>
-              )}
+              <div className="w-9 h-9 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center mb-2 mx-auto">
+                <Upload className="text-zinc-400" size={16} />
+              </div>
+              <p className="text-sm text-zinc-300 font-medium">
+                {slots.length === 0 ? "Click to upload or drag & drop" : "Drop more files here"}
+              </p>
+              <p className="text-xs text-zinc-500 mt-1">PDF, JPG, PNG · Max {MAX_FILES} files</p>
             </div>
 
-            {/* PREVIEW GRID */}
-            {file && (
-               <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                     <label className="text-xs font-medium text-zinc-400 uppercase tracking-wider">Preview</label>
-                     {numPages && (
-                        <span className="text-xs text-zinc-500">
-                          {numPages} {numPages === 1 ? 'page' : 'pages'}
-                        </span>
-                     )}
+            {/* File Queue */}
+            {slots.length > 0 && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-medium text-zinc-400 uppercase tracking-wider">
+                    Queue
+                  </label>
+                  <span className="text-xs text-zinc-500">{slots.length} file{slots.length !== 1 ? "s" : ""}</span>
+                </div>
+
+                <div 
+                  aria-label="Processing queue"
+                  className="space-y-1.5 max-h-[280px] overflow-y-auto scrollbar-thin scrollbar-thumb-zinc-700 pr-1"
+                >
+                  {slots.map((slot) => (
+                    <div 
+                      key={slot.id} 
+                      className="flex items-center gap-2.5 bg-zinc-900/60 border border-zinc-800 rounded-lg px-3 py-2"
+                      aria-label={`${slot.file.name}: ${getSlotStatusText(slot)}`}
+                    >
+                      {/* Status Icon */}
+                      <div className="shrink-0 w-5 h-5 flex items-center justify-center">
+                        {getSlotStatusIcon(slot)}
+                      </div>
+
+                      {/* File info */}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium text-white truncate">{slot.file.name}</p>
+                        {slot.error ? (
+                          <p className="text-[10px] text-red-400 truncate">{slot.error}</p>
+                        ) : (
+                          <p className="text-[10px] text-zinc-500">
+                            {(slot.file.size / 1024 / 1024).toFixed(2)} MB
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Remove button */}
+                      {!isLoading && (
+                        <button 
+                          onClick={() => (onRemoveSlot ? onRemoveSlot(slot.id) : setSlots((prev) => prev.filter((s) => s.id !== slot.id)))}
+                          className="p-1 hover:bg-red-500/10 text-zinc-500 hover:text-red-400 rounded transition-colors cursor-pointer"
+                          aria-label={`Remove ${slot.file.name}`}
+                        >
+                          <X size={12} />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Clear all */}
+                {!isLoading && slots.length > 1 && (
+                  <button 
+                    onClick={() => (onClearSlots ? onClearSlots() : setSlots([]))}
+                    className="text-xs text-zinc-600 hover:text-red-400 transition-colors cursor-pointer"
+                  >
+                    Clear all
+                  </button>
+                )}
+
+                {/* PDF Page Selector for Single PDF */}
+                {isSinglePdf && (
+                  <div className="pt-3 border-t border-zinc-800/80 space-y-3">
+                    <button
+                      type="button"
+                      onClick={() => setShowPageSelector((v) => !v)}
+                      className="w-full flex items-center justify-between px-3 py-2 bg-zinc-900/80 border border-zinc-800 rounded-lg text-xs font-medium text-zinc-300 hover:text-white hover:bg-zinc-800 transition-colors cursor-pointer"
+                    >
+                      <div className="flex items-center gap-2">
+                        <FileCheck size={14} className="text-violet-400" />
+                        <span>Page Selection & Visual Preview</span>
+                        {options.pages && (
+                          <span className="text-[10px] bg-violet-500/20 text-violet-300 px-1.5 py-0.5 rounded border border-violet-500/30">
+                            {options.pages}
+                          </span>
+                        )}
+                      </div>
+                      {showPageSelector ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                    </button>
+
+                    {showPageSelector && (
+                      <div className="bg-zinc-900/40 border border-zinc-800/80 rounded-xl p-3.5 animate-in fade-in slide-in-from-top-1 duration-150">
+                        <PdfPreviewDynamic
+                          file={slots[0].file}
+                          options={options}
+                          setOptions={setOptions}
+                          onNumPagesChange={() => {}}
+                        />
+                      </div>
+                    )}
                   </div>
-                  
-                  {file.type === 'application/pdf' ? (
-                     <div className="max-h-[400px] overflow-y-auto rounded-lg border border-zinc-800 p-2 scroll-smooth scrollbar-thin scrollbar-thumb-zinc-700">
-                       <PdfPreview 
-                          file={file} 
-                          options={options} 
-                          setOptions={setOptions} 
-                          onNumPagesChange={handleNumPagesChange} 
-                       />
-                     </div>
-                  ) : (
-                     // Image Preview (Single Item Grid)
-                     <div className="grid grid-cols-2 gap-3">
-                        <div className="relative group rounded-lg overflow-hidden border border-zinc-800">
-                           {/* eslint-disable-next-line @next/next/no-img-element */}
-                           {previewUrl && <img src={previewUrl} alt="Preview" className="w-full h-auto object-cover" />}
-                           <div className="absolute bottom-0 inset-x-0 bg-black/60 backdrop-blur-[1px] p-1.5">
-                              <p className="text-[10px] text-center text-white/90 font-medium">Original</p>
-                           </div>
-                        </div>
-                     </div>
-                  )}
-               </div>
+                )}
+              </div>
             )}
 
-            {!file && (
+            {/* URL Import — show when queue empty */}
+            {slots.length === 0 && (
                <>
                   <div className="relative">
                     <div className="absolute inset-0 flex items-center">
@@ -301,7 +385,6 @@ export function ConfigPanel({
                     </div>
                   </div>
 
-                  {/* URL Input */}
                   <div className="space-y-2">
                     <div className="flex gap-2">
                       <div className="relative flex-1">
@@ -319,7 +402,7 @@ export function ConfigPanel({
                       <button 
                         onClick={handleLoadUrl}
                         disabled={!urlInput.trim() || isLoadingUrl}
-                        className="px-3 bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-colors text-sm font-medium flex items-center gap-2"
+                        className="px-3 bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-colors text-sm font-medium flex items-center gap-2 cursor-pointer"
                       >
                         {isLoadingUrl ? (
                           <>
@@ -348,7 +431,7 @@ export function ConfigPanel({
                 <button 
                   onClick={() => handleTaskTypeChange("v1.5")}
                   className={cn(
-                    "flex-1 py-1.5 text-xs font-medium rounded transition-all",
+                    "flex-1 py-1.5 text-xs font-medium rounded transition-all cursor-pointer",
                     options.task_type === "v1.5" ? "bg-zinc-700 text-white shadow-sm" : "text-zinc-500 hover:text-zinc-300"
                   )}
                 >
@@ -357,7 +440,7 @@ export function ConfigPanel({
                 <button 
                   onClick={() => handleTaskTypeChange("default")}
                   className={cn(
-                    "flex-1 py-1.5 text-xs font-medium rounded transition-all",
+                    "flex-1 py-1.5 text-xs font-medium rounded transition-all cursor-pointer",
                     options.task_type === "default" ? "bg-zinc-700 text-white shadow-sm" : "text-zinc-500 hover:text-zinc-300"
                   )}
                 >
@@ -366,7 +449,7 @@ export function ConfigPanel({
                 <button 
                   onClick={() => handleTaskTypeChange("structure")}
                   className={cn(
-                    "flex-1 py-1.5 text-xs font-medium rounded transition-all",
+                    "flex-1 py-1.5 text-xs font-medium rounded transition-all cursor-pointer",
                     options.task_type === "structure" ? "bg-zinc-700 text-white shadow-sm" : "text-zinc-500 hover:text-zinc-300"
                   )}
                 >
@@ -492,7 +575,7 @@ export function ConfigPanel({
                 ) : (
                   <button 
                     onClick={onRequestNotificationPermission}
-                    className="text-xs px-3 py-1.5 rounded-lg bg-violet-500/10 text-violet-400 border border-violet-500/20 hover:bg-violet-500/20 transition-colors"
+                    className="text-xs px-3 py-1.5 rounded-lg bg-violet-500/10 text-violet-400 border border-violet-500/20 hover:bg-violet-500/20 transition-colors cursor-pointer"
                   >
                     ขอสิทธิ์การแจ้งเตือน
                   </button>
@@ -508,7 +591,7 @@ export function ConfigPanel({
                 <button
                   onClick={() => onToggleSound?.(!isSoundEnabled)}
                   className={cn(
-                    "relative w-10 h-5 rounded-full transition-colors duration-200 ease-in-out focus:outline-none",
+                    "relative w-10 h-5 rounded-full transition-colors duration-200 ease-in-out focus:outline-none cursor-pointer",
                     isSoundEnabled ? "bg-violet-600" : "bg-zinc-700"
                   )}
                 >
@@ -533,8 +616,8 @@ export function ConfigPanel({
       <div className="p-6 border-t border-white/10 bg-[#09090b]">
         <button 
           onClick={onSubmit}
-          disabled={!file || isLoading}
-          className="w-full bg-linear-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white font-semibold py-3.5 rounded-xl shadow-lg shadow-violet-900/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+          disabled={slots.length === 0 || isLoading}
+          className="w-full bg-linear-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white font-semibold py-3.5 rounded-xl shadow-lg shadow-violet-900/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer"
         >
           {isLoading ? (
              <>
@@ -542,7 +625,7 @@ export function ConfigPanel({
                Processing...
              </>
           ) : (
-             <>Run OCR 🚀</>
+             <>Run OCR on {slots.length} file{slots.length !== 1 ? "s" : ""} 🚀</>
            )}
         </button>
       </div>

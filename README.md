@@ -82,6 +82,8 @@ This fork provides a modern **Next.js web application** alongside the original G
 - 🔗 **URL import** for loading documents directly from the web
 - 📊 **Real-time progress** indicators during OCR processing
 - 🎨 **Compare mode** to view original and extracted text side-by-side
+- 🔄 **In-App Auto-Update**: Safe one-click GitHub update (`git pull`) with sanitized parameter checking
+- 🎨 **Design System**: Structured visual standards (`PRODUCT.md`) based on `impeccable` and `ui-ux-pro-max` guidelines
 
 > **This fork focuses on Windows 10/11.** For macOS/Linux setup, please refer to the official Typhoon OCR repository.
 >
@@ -205,15 +207,19 @@ pdftoppm -v
 ## Features
 
 - ✅ Upload PDF or images (PNG, JPG, WebP)
-- ✅ Multi-page PDF selection with visual grid preview
-- ✅ Import documents from URL (with CORS proxy)
+- 🚀 **Multi-File Batch OCR**: Upload & queue up to 10 documents simultaneously
+- ⚡ **Sliding Window Concurrent Engine**: Process multiple files in parallel with low memory footprint
+- ✅ Multi-page PDF selection with visual grid preview & **viewport-based lazy loading** (prevents memory lag)
+- ✅ Import documents from URL (with CORS proxy & robust MIME fallback)
 - ✅ Shift-click for range selection
 - ✅ Quick actions: Select All, Odd/Even pages, Custom range
 - ✅ Two task types: `default` (Markdown) and `structure` (HTML tables)
 - ⚡ **Lightning Fast Asynchronous Backend** processing pages concurrently
-- ✅ Real-time progress indicator
+- ⚡ **Progressive Page Rendering**: Render multi-page markdown outputs smoothly without freezing the UI
+- ✅ Real-time progress indicator per file with live status badges
+- ✅ Tabbed results navigation with "+X more" overflow dropdown
 - ✅ Compare mode: Original image vs. extracted text
-- ✅ Copy extracted text with one click
+- 📦 **Flexible Export Options**: Copy text/markdown (per-file or merged) & Download `.md` or `.zip` archives (with filename deduplication)
 - ✅ Code generator for API integration
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
@@ -228,8 +234,8 @@ pdftoppm -v
 - [x] Progress indicators
 - [x] Compare view mode
 - [x] **Asynchronous/Concurrent OCR processing**
-- [ ] Batch processing
-- [ ] Export to Markdown/HTML file
+- [x] **Batch multi-file processing (up to 10 files)**
+- [x] **Export to Markdown (`.md`) and ZIP archives (`.zip`) (per-file & merged)**
 - [ ] Support for more document types
 
 See the [open issues](https://github.com/naravid19/typhoon-ocr/issues) for a full list of proposed features (and known issues).

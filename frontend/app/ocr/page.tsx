@@ -1,26 +1,20 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Navbar } from "@/components/Navbar";
 import { ConfigPanel } from "@/components/ConfigPanel";
 import { ResponsePanel } from "@/components/ResponsePanel";
 import { NotificationProvider, useNotificationContext } from "@/providers/NotificationProvider";
-import { OcrOptions, OcrResult } from "@/types/ocr";
-import { processOcrWithProgress, OcrProgress } from "@/lib/api";
+import { OcrOptions, FileSlot } from "@/types/ocr";
+import { processBatch } from "@/lib/processBatch";
 import { AlertCircle } from "lucide-react";
 
 function OcrPageContent() {
   const [mounted, setMounted] = useState(false);
-  const [file, setFile] = useState<File | null>(null);
-  const [result, setResult] = useState<OcrResult | null>(null);
+  const [slots, setSlots] = useState<FileSlot[]>([]);
+  const [activeSlotId, setActiveSlotId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [, setNumPages] = useState<number | null>(null);
-  
-  // Real-time progress tracking
-  const [currentPage, setCurrentPage] = useState(0);
-  const [totalPages, setTotalPages] = useState(0);
-  const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
   // Notification Context
   const { 
@@ -46,56 +40,82 @@ function OcrPageContent() {
     pages: "",
   });
 
-  const handleProgress = (progress: OcrProgress) => {
-    const total = progress.total_pages ?? progress.total ?? 0;
-    
-    if (progress.message) {
-      setStatusMessage(progress.message);
-    }
+  const updateSlot = useCallback(
+    (id: string, patch: Partial<FileSlot>) =>
+      setSlots((prev) => prev.map((s) => (s.id === id ? { ...s, ...patch } : s))),
+    []
+  );
 
-    if (progress.type === "start") {
-      setTotalPages(total);
-      setCurrentPage(0);
-      setStatusMessage("Document analysis complete. Starting OCR...");
-    } else if (progress.type === "progress") {
-      setCurrentPage(progress.current ?? 0);
-      setTotalPages(total);
-      if (progress.page) {
-        setStatusMessage(`Processing page ${progress.page}...`);
-      }
-    }
-  };
+  const handleRemoveSlot = useCallback((id: string) => {
+    setSlots((prev) => {
+      const next = prev.filter((s) => s.id !== id);
+      setActiveSlotId((curr) => {
+        if (curr !== id) return curr;
+        return next.length > 0 ? next[0].id : null;
+      });
+      return next;
+    });
+  }, []);
+
+  const handleClearSlots = useCallback(() => {
+    setSlots([]);
+    setActiveSlotId(null);
+  }, []);
 
   const handleSubmit = async () => {
-    if (!file) return;
+    const pendingSlots = slots.filter((s) => !s.result && !s.isLoading);
+    if (pendingSlots.length === 0) return;
 
     setIsLoading(true);
     setError(null);
-    setResult(null);
-    setCurrentPage(0);
-    setTotalPages(0);
-    setStatusMessage("Uploading and connecting...");
+
+    // Mark all pending slots as loading
+    pendingSlots.forEach((s) => updateSlot(s.id, { isLoading: true, error: null }));
+
+    // Auto-select first slot if none selected
+    if (!activeSlotId && pendingSlots.length > 0) {
+      setActiveSlotId(pendingSlots[0].id);
+    }
+
+    let succeededCount = 0;
+    let failedCount = 0;
 
     try {
-      const data = await processOcrWithProgress(file, options, handleProgress);
-      if (data.success) {
-        setResult(data);
-        
-        // Show success notifications
+      await processBatch(
+        pendingSlots,
+        options,
+        (id, progress) => {
+          updateSlot(id, {
+            currentPage: progress.current ?? 0,
+            totalPages: progress.total_pages ?? progress.total ?? 0,
+            statusMessage: progress.message ?? null,
+          });
+        },
+        (id, result, err) => {
+          if (result && !err) {
+            succeededCount++;
+          } else {
+            failedCount++;
+          }
+          updateSlot(id, {
+            isLoading: false,
+            result,
+            error: err,
+            statusMessage: null,
+          });
+        }
+      );
+
+      if (succeededCount > 0) {
         toast.success(
           "✅ OCR สำเร็จ!",
-          `ประมวลผลเสร็จสิ้น ${data.results.length} หน้า ใช้เวลา ${data.processing_time.toFixed(2)} วินาที`
+          `ประมวลผลสำเร็จ ${succeededCount} ไฟล์${failedCount > 0 ? ` (${failedCount} ไฟล์ไม่สำเร็จ)` : ""}`
         );
-        
-        // Browser notification (if permitted)
-        notify("✅ OCR สำเร็จ!", {
-          body: `ประมวลผลเสร็จสิ้น ${data.results.length} หน้า`,
-        });
+        notify("✅ OCR สำเร็จ!", { body: `ประมวลผลเสร็จสิ้น ${succeededCount} ไฟล์` });
       } else {
-        setError(data.error || "Failed to process document");
-        toast.error("❌ เกิดข้อผิดพลาด", data.error || "ไม่สามารถประมวลผลเอกสารได้");
+        toast.error("❌ ประมวลผลไม่สำเร็จ", "ไม่สามารถประมวลผลไฟล์ใดได้เลย");
       }
-    } catch (err: unknown) {
+    } catch (err) {
       const errorMessage =
         err instanceof Error ? err.message : "An error occurred";
       setError(errorMessage);
@@ -117,11 +137,12 @@ function OcrPageContent() {
         <ConfigPanel
           options={options}
           setOptions={setOptions}
-          file={file}
-          setFile={setFile}
+          slots={slots}
+          setSlots={setSlots}
+          onRemoveSlot={handleRemoveSlot}
+          onClearSlots={handleClearSlots}
           onSubmit={handleSubmit}
           isLoading={isLoading}
-          onNumPagesChange={setNumPages}
           notificationPermission={hasPermission}
           onRequestNotificationPermission={requestPermission}
           isSoundEnabled={isSoundEnabled}
@@ -143,13 +164,11 @@ function OcrPageContent() {
           )}
 
           <ResponsePanel
-            result={result}
+            slots={slots}
+            activeSlotId={activeSlotId}
+            setActiveSlotId={setActiveSlotId}
             options={options}
-            file={file}
             isLoading={isLoading}
-            currentPage={currentPage}
-            totalPages={totalPages}
-            statusMessage={statusMessage}
           />
         </div>
       </main>

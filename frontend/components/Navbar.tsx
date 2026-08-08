@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { FileText } from "lucide-react";
+import { UpdateBadge } from "./UpdateBadge";
 
 export function Navbar() {
   return (
@@ -21,6 +22,7 @@ export function Navbar() {
       </div>
       
       <div className="flex items-center gap-4">
+        <UpdateBadge />
         <a 
           href="https://docs.opentyphoon.ai" 
           target="_blank" 

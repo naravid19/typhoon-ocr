@@ -25,3 +25,15 @@ export interface OcrOptions {
   repetition_penalty: number;
   pages?: string; 
 }
+
+export interface FileSlot {
+  id: string;             // crypto.randomUUID()
+  file: File;
+  result: OcrResult | null;
+  isLoading: boolean;
+  error: string | null;
+  currentPage: number;
+  totalPages: number;
+  statusMessage: string | null;
+}
+

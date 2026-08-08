@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.1.1] - 2026-08-08
+
+### Added
+- **Automatic GitHub Update Checker**: Integrated `UpdateBadge` component in Navbar to check for new releases/commits on GitHub via lightweight API (`/api/update/check`), prompting users when an update is available without consuming extra CPU/memory.
+- **One-Click Git Pull Update**: Added safe in-app update trigger (`/api/update/pull`) executing `git pull origin main` with automated working directory status verification (`git status --porcelain`) to prevent merge conflicts.
+
+### Security
+- **Strict Git Branch Sanitization**: Applied strict regex validation (`/^[a-zA-Z0-9_\-\.\/]+$/`) on branch names in `/api/update/pull` to eliminate shell command injection risks.
+
+### Changed & Improved (UX/UI)
+- **Keyboard Accessibility & Popover Polish**: Enhanced `UpdateBadge` with `Escape` key handlers, outside-click closing, and full ARIA attributes (`aria-expanded`, `role="dialog"`).
+- **Design System Alignment**: Created [`PRODUCT.md`](PRODUCT.md) establishing core product facts and visual standards using `impeccable` and `ui-ux-pro-max` guidelines.
+
+### Fixed
+- **Viewport-Based PDF Lazy Loading**: Implemented `<LazyPdfPage>` with `IntersectionObserver` in `PdfPreview.tsx` to render PDF page canvases on-demand when scrolled into view, eliminating memory spikes and browser freezes on large multi-page documents.
+- **Robust PDF Single-File Detection**: Enhanced `isSinglePdf` check in `ConfigPanel.tsx` with a filename extension fallback (`.endsWith(".pdf")`), ensuring page selection tools (range, checkboxes, odd/even) remain visible even when OS/URL imports omit the MIME type.
+- **Progressive Markdown Page Rendering**: Added `visiblePageCount` state and progressive pagination to `ResponsePanel.tsx` to prevent UI lag when rendering complex multi-page Markdown outputs with syntax highlighting.
+
+## [v1.1.0] - 2026-08-08
+
+### Added
+- **Multi-File Batch OCR**: Support uploading up to 10 documents/images simultaneously with queue management, file removal, and clear-all actions.
+- **Sliding Window Concurrent Queue**: Implemented a dynamic worker queue (`processBatch.ts`) with concurrency cap of 3 to maximize throughput without stalling the browser main thread.
+- **Tabbed Results Panel**: Added per-file tab strip with live status badges (pending, processing, success, error) and "+X more" overflow dropdown.
+- **Flexible Copy & Export Engine**: Extended copy and download capabilities to support per-file Markdown/Text, merged multi-file Markdown/Text, and ZIP archives (`.zip`) with automatic filename deduplication.
+- **Keyboard Accessibility**: Added `focus-within` keyboard navigation support to the overflow tabs dropdown in `ResponsePanel.tsx`.
+
+### Fixed
+- **Server-Level 404 Redirect**: Added `redirects()` configuration in `next.config.ts` mapping `/` to `/ocr` at the server level, preventing 404 warnings during initial startup.
+- **React Re-render Freeze**: Wrapped `MarkdownContent` with `React.memo` to eliminate main thread UI freezes during SSE progress stream updates.
+- **Download Race Condition**: Delayed `URL.revokeObjectURL` in `export.ts` via `setTimeout` to prevent premature URL revocation during browser downloads.
+- **Security Vulnerabilities**: Resolved high-severity package vulnerabilities (`pdfjs-dist` CVE GHSA-hq66-cqwq-w95j) via `npm audit fix`.
+
 ## [v1.0.3] - 2026-04-25
 
 ### Added

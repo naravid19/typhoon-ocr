@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Document, Page, pdfjs } from 'react-pdf';
 import { cn } from "@/lib/utils";
 import { CheckCircle2, CheckSquare, Square, Minus, ArrowRight } from "lucide-react";
@@ -9,6 +9,45 @@ import { OcrOptions } from "@/types/ocr";
 // Configure PDF worker
 if (typeof window !== 'undefined') {
     pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+}
+
+function LazyPdfPage({ pageNum }: { pageNum: number }) {
+  const [isVisible, setIsVisible] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setIsVisible(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: "300px" }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <div ref={containerRef} className="w-full min-h-[220px] bg-zinc-950 flex items-center justify-center">
+      {isVisible ? (
+        <Page
+          pageNumber={pageNum}
+          width={160}
+          renderAnnotationLayer={false}
+          renderTextLayer={false}
+        />
+      ) : (
+        <div className="flex flex-col items-center gap-1 text-zinc-600">
+          <div className="w-4 h-4 border-2 border-zinc-700 border-t-zinc-400 rounded-full animate-spin" />
+          <span className="text-[10px]">Page {pageNum}</span>
+        </div>
+      )}
+    </div>
+  );
 }
 
 interface PdfPreviewProps {
@@ -315,12 +354,7 @@ export default function PdfPreview({ file, options, setOptions, onNumPagesChange
                       : "border-zinc-800 hover:border-zinc-600"
                 )}
               >
-                <Page 
-                  pageNumber={pageNum} 
-                  width={160} 
-                  renderAnnotationLayer={false} 
-                  renderTextLayer={false} 
-                />
+                <LazyPdfPage pageNum={pageNum} />
                 
                 {/* Selection Indicator */}
                 <div className={cn(
