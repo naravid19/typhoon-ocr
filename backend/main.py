@@ -24,6 +24,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from routes.ocr import router as ocr_router
+from routes.env import router as env_router
 
 
 @asynccontextmanager
@@ -55,6 +56,7 @@ app.add_middleware(
 
 # Include routers
 app.include_router(ocr_router)
+app.include_router(env_router)
 
 
 @app.get("/health")

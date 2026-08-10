@@ -37,11 +37,11 @@ if !ERRORLEVEL! neq 0 (
     pause
 )
 
-REM Check for Port Conflicts
-netstat -ano | findstr :8345 >nul
+REM Check for Port Conflicts (Listening State)
+netstat -ano | findstr /C:":8345 " | findstr LISTENING >nul
 if !ERRORLEVEL! equ 0 (
-    echo   [!] Error: Port 8345 is already in use.
-    echo       Please stop the process using it and try again.
+    echo   [!] Error: Port 8345 is already in use by another server.
+    echo       Please stop the process listening on port 8345 and try again.
     goto :error_exit
 )
 

@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Smart OCR Resume & Retry Logic**: Enhanced the processing queue to automatically filter out successful files. When rate limits (HTTP 429) or errors occur, the UI transforms into a "Retry OCR on X remaining files" button, allowing users to seamlessly resume failed tasks without removing completed ones.
+- **Configurable Max Upload Limit**: Added `TYPHOON_MAX_FILES` configuration (default: 10) dynamically linked between the backend (`.env`) and frontend, adjustable via the in-app Settings UI.
+
+### Fixed
+- **Port Conflict Mitigation**: Updated process management and documentation to handle scenarios where the default port might get stuck in use.
+- **ReferenceError on Settings Modal**: Fixed a missing `FileText` icon import causing UI crashes when viewing configuration.
+
 ## [v1.1.1] - 2026-08-08
 
 ### Added

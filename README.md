@@ -81,6 +81,8 @@ This fork provides a modern **Next.js web application** alongside the original G
 - 📄 **Multi-page PDF support** with interactive page selection
 - 🔗 **URL import** for loading documents directly from the web
 - 📊 **Real-time progress** indicators during OCR processing
+- 🤖 **Smart Resume & Retry**: Automatically filter successful files and retry only rate-limited or failed files (e.g., HTTP 429) without losing queue progress.
+- ⚙️ **Configurable Limits**: Dynamically adjust `MAX_FILES` directly via the in-app Settings panel.
 - 🎨 **Compare mode** to view original and extracted text side-by-side
 - 🔄 **In-App Auto-Update**: Safe one-click GitHub update (`git pull`) with sanitized parameter checking
 - 🎨 **Design System**: Structured visual standards (`PRODUCT.md`) based on `impeccable` and `ui-ux-pro-max` guidelines

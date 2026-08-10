@@ -338,3 +338,9 @@ def get_ocr_service() -> TyphoonOCRService:
     if _service_instance is None:
         _service_instance = TyphoonOCRService()
     return _service_instance
+
+
+def reset_service() -> None:
+    """Reset the OCR service singleton so it reloads config on next access."""
+    global _service_instance
+    _service_instance = None

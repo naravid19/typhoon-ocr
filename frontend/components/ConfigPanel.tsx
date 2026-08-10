@@ -4,6 +4,7 @@ import { useDropzone } from "react-dropzone";
 import { Upload, X, FileText, Settings, ChevronRight, ChevronDown, ChevronUp, Link as LinkIcon, Loader2, FileCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { OcrOptions, FileSlot } from "@/types/ocr";
+import { SettingsModal } from "./SettingsModal";
 
 const PdfPreviewDynamic = dynamic(() => import("./PdfPreview"), {
   ssr: false,
@@ -12,7 +13,6 @@ const PdfPreviewDynamic = dynamic(() => import("./PdfPreview"), {
 
 const LEGACY_DEFAULT_REPETITION_PENALTY = 1.2;
 const V15_REPETITION_PENALTY = 1.1;
-const MAX_FILES = 10;
 
 function getSlotStatusIcon(slot: FileSlot) {
   if (slot.isLoading) {
@@ -72,6 +72,28 @@ export function ConfigPanel({
   const [isLoadingUrl, setIsLoadingUrl] = useState(false);
   const [urlError, setUrlError] = useState<string | null>(null);
   const [showPageSelector, setShowPageSelector] = useState(true);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [maxFiles, setMaxFiles] = useState(10);
+
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8345";
+
+  const fetchEnvConfig = useCallback(async () => {
+    try {
+      const response = await fetch(`${apiUrl}/api/env`);
+      if (response.ok) {
+        const { data } = await response.json();
+        if (data.TYPHOON_MAX_FILES) {
+          setMaxFiles(data.TYPHOON_MAX_FILES);
+        }
+      }
+    } catch (error) {
+      console.error("Failed to fetch env config", error);
+    }
+  }, [apiUrl]);
+
+  useEffect(() => {
+    fetchEnvConfig();
+  }, [fetchEnvConfig]);
 
   const isSinglePdf = slots.length === 1 && (
     slots[0].file.type === "application/pdf" || 
@@ -96,11 +118,11 @@ export function ConfigPanel({
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     setUrlError(null);
-    const remaining = MAX_FILES - slots.length;
+    const remaining = maxFiles - slots.length;
     if (remaining <= 0) return;
     const toAdd = acceptedFiles.slice(0, remaining);
     if (acceptedFiles.length > remaining) {
-      alert(`รับสูงสุด ${MAX_FILES} ไฟล์ — เพิ่ม ${toAdd.length} ไฟล์แรกเท่านั้น`);
+      alert(`รับสูงสุด ${maxFiles} ไฟล์ — เพิ่ม ${toAdd.length} ไฟล์แรกเท่านั้น`);
     }
     const newSlots: FileSlot[] = toAdd.map((f) => ({
       id: crypto.randomUUID(),
@@ -114,7 +136,7 @@ export function ConfigPanel({
     }));
     setSlots((prev) => [...prev, ...newSlots]);
     setOptions((prev) => ({ ...prev, pages: "" }));
-  }, [slots.length, setSlots, setOptions]);
+  }, [slots.length, setSlots, setOptions, maxFiles]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -122,7 +144,7 @@ export function ConfigPanel({
       'image/*': ['.png', '.jpg', '.jpeg', '.webp'],
       'application/pdf': ['.pdf']
     },
-    maxFiles: MAX_FILES,
+    maxFiles: maxFiles,
     multiple: true
   });
 
@@ -143,8 +165,8 @@ export function ConfigPanel({
   const handleLoadUrl = async () => {
     if (!urlInput.trim()) return;
 
-    if (slots.length >= MAX_FILES) {
-      setUrlError(`รับสูงสุด ${MAX_FILES} ไฟล์ — กรุณาลบไฟล์เก่าออกก่อน`);
+    if (slots.length >= maxFiles) {
+      setUrlError(`รับสูงสุด ${maxFiles} ไฟล์ — กรุณาลบไฟล์เก่าออกก่อน`);
       return;
     }
 
@@ -212,7 +234,16 @@ export function ConfigPanel({
     <div className="flex flex-col h-full bg-[#09090b] border-r border-white/10 w-full lg:w-[400px] xl:w-[450px] shrink-0">
       {/* Model Selector Header */}
       <div className="p-4 border-b border-white/10">
-        <label className="text-xs text-zinc-500 font-medium mb-1.5 block">MODEL</label>
+        <div className="flex items-center justify-between mb-1.5">
+          <label className="text-xs text-zinc-500 font-medium block">MODEL</label>
+          <button 
+            onClick={() => setIsSettingsOpen(true)}
+            className="text-zinc-500 hover:text-white transition-colors cursor-pointer"
+            title="Environment Settings"
+          >
+            <Settings size={14} />
+          </button>
+        </div>
         <div className="relative">
           <select 
             className="w-full appearance-none bg-zinc-900 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-zinc-200 focus:outline-none focus:border-violet-500 transition-colors cursor-pointer"
@@ -274,7 +305,7 @@ export function ConfigPanel({
               <p className="text-sm text-zinc-300 font-medium">
                 {slots.length === 0 ? "Click to upload or drag & drop" : "Drop more files here"}
               </p>
-              <p className="text-xs text-zinc-500 mt-1">PDF, JPG, PNG · Max {MAX_FILES} files</p>
+              <p className="text-xs text-zinc-500 mt-1">PDF, JPG, PNG · Max {maxFiles} files</p>
             </div>
 
             {/* File Queue */}
@@ -616,7 +647,7 @@ export function ConfigPanel({
       <div className="p-6 border-t border-white/10 bg-[#09090b]">
         <button 
           onClick={onSubmit}
-          disabled={slots.length === 0 || isLoading}
+          disabled={slots.filter((s) => !s.result && !s.isLoading).length === 0 || isLoading}
           className="w-full bg-linear-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white font-semibold py-3.5 rounded-xl shadow-lg shadow-violet-900/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer"
         >
           {isLoading ? (
@@ -624,11 +655,25 @@ export function ConfigPanel({
                <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
                Processing...
              </>
-          ) : (
-             <>Run OCR on {slots.length} file{slots.length !== 1 ? "s" : ""} 🚀</>
-           )}
+          ) : (() => {
+             const pendingCount = slots.filter((s) => !s.result && !s.isLoading).length;
+             const totalCount = slots.length;
+             const hasCompleted = totalCount > 0 && pendingCount < totalCount;
+             
+             if (totalCount === 0) return <>Select files to begin</>;
+             if (pendingCount === 0) return <>All files completed 🎉</>;
+             if (hasCompleted) return <>Retry OCR on {pendingCount} remaining file{pendingCount !== 1 ? "s" : ""} 🚀</>;
+             return <>Run OCR on {totalCount} file{totalCount !== 1 ? "s" : ""} 🚀</>;
+          })()}
         </button>
       </div>
+
+      {/* Settings Modal */}
+      <SettingsModal 
+        isOpen={isSettingsOpen} 
+        onClose={() => setIsSettingsOpen(false)} 
+        onSave={fetchEnvConfig}
+      />
     </div>
   );
 }
