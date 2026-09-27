@@ -320,12 +320,12 @@ export default function PdfPreview({ file, options, setOptions, onNumPagesChange
       </div>
       
       {/* Info Text */}
-      <div className="text-[10px] text-zinc-600 px-1 space-y-1">
+      <div className="text-[10px] text-zinc-500 px-1 space-y-1">
         <p>{hasSelection 
           ? `${selectedPages.size} of ${numPages || '?'} pages selected`
           : "No selection = All pages will be processed"
         }</p>
-        <p className="text-zinc-700">💡 Tip: Hold <kbd className="px-1 py-0.5 bg-zinc-800 rounded text-zinc-400">Shift</kbd> + click to select a range</p>
+        <p className="text-zinc-500">Tip: Hold <kbd className="px-1 py-0.5 bg-zinc-800 rounded text-zinc-400">Shift</kbd> + click to select a range</p>
       </div>
       
       {/* PDF Document Grid */}

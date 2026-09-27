@@ -1,21 +1,21 @@
 import Link from "next/link";
-import { FileText } from "lucide-react";
+import { FileText, ExternalLink } from "lucide-react";
 import { UpdateBadge } from "./UpdateBadge";
 
 export function Navbar() {
   return (
-    <nav suppressHydrationWarning className="fixed top-0 left-0 right-0 h-16 border-b border-[rgba(255,255,255,0.08)] bg-[rgba(9,9,11,0.8)] backdrop-blur-md z-50 flex items-center justify-between px-6">
-      <div className="flex items-center gap-4">
-        <Link href="/" className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-linear-to-br from-violet-600 to-indigo-600 flex items-center justify-center text-white font-bold">
-            <FileText size={18} />
+    <header suppressHydrationWarning className="fixed top-0 left-0 right-0 h-13 border-b border-white/[0.08] bg-[#09090b]/90 backdrop-blur-md z-50 flex items-center justify-between px-5">
+      <div className="flex items-center gap-3">
+        <Link href="/" className="flex items-center gap-2.5 group">
+          <div className="w-7 h-7 rounded-md bg-violet-600 flex items-center justify-center text-white font-semibold shadow-xs">
+            <FileText size={15} />
           </div>
-          <div className="flex flex-col">
-            <span className="font-bold text-lg tracking-tight leading-tight">
-              TYPHOON
+          <div className="flex items-baseline gap-1.5">
+            <span className="font-semibold text-sm tracking-tight text-zinc-100 group-hover:text-white transition-colors">
+              TYPHOON OCR
             </span>
-            <span className="text-[10px] text-violet-400 font-medium tracking-widest leading-tight">
-              OCR
+            <span className="text-[10px] text-violet-400/90 font-mono uppercase tracking-wider px-1.5 py-0.5 rounded bg-violet-500/10 border border-violet-500/20">
+              Studio
             </span>
           </div>
         </Link>
@@ -27,12 +27,12 @@ export function Navbar() {
           href="https://docs.opentyphoon.ai" 
           target="_blank" 
           rel="noopener noreferrer"
-          className="text-xs text-zinc-400 hover:text-white transition-colors"
+          className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-zinc-200 transition-colors font-medium px-2.5 py-1 rounded-md hover:bg-zinc-800/50"
         >
-          Documentation
+          <span>Docs</span>
+          <ExternalLink size={12} className="text-zinc-500" />
         </a>
-        <div suppressHydrationWarning className="w-8 h-8 rounded-full bg-linear-to-tr from-violet-500 to-fuchsia-500 border border-white/10"></div>
       </div>
-    </nav>
+    </header>
   );
 }

@@ -95,12 +95,12 @@ export function UpdateBadge() {
           onClick={() => setIsOpen(!isOpen)}
           aria-expanded={isOpen}
           aria-label="Software update available"
-          className="flex items-center gap-1.5 px-3 py-1 text-xs font-medium rounded-full bg-violet-500/15 border border-violet-500/30 text-violet-300 hover:bg-violet-500/25 transition-all shadow-sm hover:shadow-violet-500/20 cursor-pointer animate-pulse"
+          className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-full bg-violet-500/10 border border-violet-500/30 text-violet-300 hover:bg-violet-500/20 transition-all cursor-pointer"
           title="New update available from GitHub"
         >
-          <Sparkles size={13} className="text-violet-400" />
+          <Sparkles size={12} className="text-violet-400" />
           <span>Update Available</span>
-          <span className="w-2 h-2 rounded-full bg-violet-400"></span>
+          <span className="w-1.5 h-1.5 rounded-full bg-violet-400" />
         </button>
       )}
 
@@ -109,11 +109,11 @@ export function UpdateBadge() {
         <div 
           role="dialog"
           aria-label="Software update options"
-          className="absolute right-0 mt-2 w-80 p-4 rounded-xl border border-zinc-800 bg-zinc-950/95 backdrop-blur-xl shadow-2xl z-50 text-xs animate-in fade-in zoom-in-95 duration-150"
+          className="absolute right-0 mt-2 w-80 p-4 rounded-xl border border-white/[0.08] bg-[#121215] shadow-2xl z-50 text-xs animate-in fade-in zoom-in-95 duration-150"
         >
-          <div className="flex items-center justify-between pb-3 border-b border-zinc-800/80 mb-3">
+          <div className="flex items-center justify-between pb-3 border-b border-white/[0.08] mb-3">
             <div className="flex items-center gap-2 font-semibold text-zinc-100">
-              <Download size={15} className="text-violet-400" />
+              <Download size={14} className="text-violet-400" />
               <span>Software Update</span>
             </div>
             <button
@@ -128,7 +128,7 @@ export function UpdateBadge() {
           {status === "available" && info && (
             <div className="space-y-3">
               <div className="bg-zinc-900/60 p-2.5 rounded-lg border border-zinc-800/60 space-y-1">
-                <div className="flex justify-between text-zinc-400 text-[11px]">
+                <div className="flex justify-between text-zinc-400 text-[11px] font-mono">
                   <span>Local: <code className="text-zinc-200">{info.localSHA}</code></span>
                   <span>Latest: <code className="text-violet-400">{info.remoteSHA}</code></span>
                 </div>
@@ -141,9 +141,9 @@ export function UpdateBadge() {
 
               <button
                 onClick={handlePull}
-                className="w-full py-2 px-3 bg-violet-600 hover:bg-violet-500 active:bg-violet-700 text-white font-medium rounded-lg transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md shadow-violet-600/20 active:scale-[0.98]"
+                className="w-full btn-primary py-2 px-3 text-xs font-medium flex items-center justify-center gap-2"
               >
-                <Download size={14} />
+                <Download size={13} />
                 <span>Pull & Update Now</span>
               </button>
             </div>

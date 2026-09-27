@@ -24,20 +24,10 @@ export interface ToastMessage {
  * Icons for each toast variant
  */
 const variantIcons: Record<ToastVariant, React.ReactNode> = {
-  success: <CheckCircle size={18} className="text-green-400" />,
-  error: <AlertCircle size={18} className="text-red-400" />,
-  warning: <AlertTriangle size={18} className="text-yellow-400" />,
-  info: <Info size={18} className="text-blue-400" />,
-};
-
-/**
- * Background styles for each variant
- */
-const variantStyles: Record<ToastVariant, string> = {
-  success: "bg-gradient-to-r from-emerald-500/10 to-green-500/5 border-emerald-500/20 shadow-[0_0_30px_-5px_rgba(16,185,129,0.2)]",
-  error: "bg-gradient-to-r from-red-500/10 to-rose-500/5 border-red-500/20 shadow-[0_0_30px_-5px_rgba(239,68,68,0.2)]",
-  warning: "bg-gradient-to-r from-amber-500/10 to-yellow-500/5 border-amber-500/20 shadow-[0_0_30px_-5px_rgba(245,158,11,0.2)]",
-  info: "bg-gradient-to-r from-blue-500/10 to-cyan-500/5 border-blue-500/20 shadow-[0_0_30px_-5px_rgba(59,130,246,0.2)]",
+  success: <CheckCircle size={15} className="text-emerald-400" />,
+  error: <AlertCircle size={15} className="text-red-400" />,
+  warning: <AlertTriangle size={15} className="text-amber-400" />,
+  info: <Info size={15} className="text-blue-400" />,
 };
 
 /**
@@ -53,10 +43,10 @@ function ToastItem({
   const [isExiting, setIsExiting] = useState(false);
 
   useEffect(() => {
-    const duration = toast.duration || 5000;
+    const duration = toast.duration || 4500;
     const timer = setTimeout(() => {
       setIsExiting(true);
-      setTimeout(() => onRemove(toast.id), 300);
+      setTimeout(() => onRemove(toast.id), 250);
     }, duration);
 
     return () => clearTimeout(timer);
@@ -64,59 +54,52 @@ function ToastItem({
 
   const handleClose = () => {
     setIsExiting(true);
-    setTimeout(() => onRemove(toast.id), 300);
+    setTimeout(() => onRemove(toast.id), 250);
   };
 
   return (
     <div
       className={cn(
-        "relative flex items-start gap-4 px-5 py-4 rounded-xl border backdrop-blur-xl max-w-sm w-full overflow-hidden transition-all",
-        variantStyles[toast.variant],
+        "relative flex items-start gap-3 px-4 py-3 rounded-lg border border-white/[0.08] bg-[#121215] shadow-lg max-w-sm w-full overflow-hidden transition-all",
         isExiting
-          ? "animate-out fade-out-0 slide-out-to-right-full duration-500 ease-in-out"
-          : "animate-in fade-in-0 slide-in-from-bottom-8 duration-500 ease-out fill-mode-backwards"
+          ? "opacity-0 translate-y-2 duration-200 ease-in"
+          : "animate-in fade-in slide-in-from-bottom-3 duration-200 ease-out"
       )}
     >
-      {/* Icon with glow */}
-      <div className="shrink-0 mt-0.5 relative">
-        <div className={cn(
-          "absolute inset-0 blur-lg opacity-50",
-          toast.variant === "success" && "bg-emerald-500",
-          toast.variant === "error" && "bg-red-500",
-          toast.variant === "warning" && "bg-amber-500",
-          toast.variant === "info" && "bg-blue-500",
-        )} />
-        <div className="relative">{variantIcons[toast.variant]}</div>
+      {/* Icon */}
+      <div className="shrink-0 mt-0.5">
+        {variantIcons[toast.variant]}
       </div>
 
       {/* Content */}
-      <div className="flex-1 min-w-0 z-10">
-        <p className="text-sm font-semibold text-white tracking-wide">{toast.title}</p>
+      <div className="flex-1 min-w-0">
+        <p className="text-xs font-semibold text-zinc-100">{toast.title}</p>
         {toast.description && (
-          <p className="text-xs text-zinc-300 mt-1 leading-relaxed">{toast.description}</p>
+          <p className="text-[11px] text-zinc-400 mt-0.5 leading-relaxed">{toast.description}</p>
         )}
       </div>
 
       {/* Close button */}
       <button
         onClick={handleClose}
-        className="shrink-0 p-1.5 hover:bg-white/10 rounded-md transition-colors -mr-2 -mt-2 group"
+        className="shrink-0 p-1 hover:bg-white/[0.06] rounded transition-colors text-zinc-500 hover:text-zinc-300"
+        title="Dismiss"
       >
-        <X size={14} className="text-zinc-500 group-hover:text-white transition-colors" />
+        <X size={12} />
       </button>
 
-      {/* Progress bar */}
-      <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-white/5">
+      {/* Bottom accent indicator */}
+      <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-white/[0.04]">
         <div
           className={cn(
-            "h-full shadow-[0_0_10px_rgba(255,255,255,0.5)]",
-            toast.variant === "success" && "bg-gradient-to-r from-emerald-500 to-green-400",
-            toast.variant === "error" && "bg-gradient-to-r from-red-500 to-rose-400",
-            toast.variant === "warning" && "bg-gradient-to-r from-amber-500 to-yellow-400",
-            toast.variant === "info" && "bg-gradient-to-r from-blue-500 to-cyan-400"
+            "h-full",
+            toast.variant === "success" && "bg-emerald-500",
+            toast.variant === "error" && "bg-red-500",
+            toast.variant === "warning" && "bg-amber-500",
+            toast.variant === "info" && "bg-blue-500"
           )}
           style={{
-            animation: `shrink ${toast.duration || 5000}ms linear forwards`,
+            animation: `shrink ${toast.duration || 4500}ms linear forwards`,
           }}
         />
       </div>
@@ -145,7 +128,7 @@ export function ToastContainer({
   if (toasts.length === 0) return null;
 
   return (
-    <div suppressHydrationWarning className="fixed bottom-6 right-6 z-50 flex flex-col gap-2">
+    <div suppressHydrationWarning className="fixed bottom-5 right-5 z-50 flex flex-col gap-2">
       {toasts.map((toast) => (
         <ToastItem key={toast.id} toast={toast} onRemove={onRemove} />
       ))}
@@ -168,9 +151,6 @@ export function useToast() {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
-  /**
-   * Convenience methods for different variants
-   */
   const toast = {
     success: (title: string, description?: string, duration?: number) =>
       addToast({ variant: "success", title, description, duration }),

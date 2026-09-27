@@ -109,18 +109,18 @@ function OcrPageContent() {
 
       if (succeededCount > 0) {
         toast.success(
-          "✅ OCR สำเร็จ!",
+          "ประมวลผลสำเร็จ",
           `ประมวลผลสำเร็จ ${succeededCount} ไฟล์${failedCount > 0 ? ` (${failedCount} ไฟล์ไม่สำเร็จ)` : ""}`
         );
-        notify("✅ OCR สำเร็จ!", { body: `ประมวลผลเสร็จสิ้น ${succeededCount} ไฟล์` });
+        notify("ประมวลผลสำเร็จ", { body: `ประมวลผลเสร็จสิ้น ${succeededCount} ไฟล์` });
       } else {
-        toast.error("❌ ประมวลผลไม่สำเร็จ", "ไม่สามารถประมวลผลไฟล์ใดได้เลย");
+        toast.error("ประมวลผลไม่สำเร็จ", "ไม่สามารถประมวลผลไฟล์ใดได้เลย");
       }
     } catch (err) {
       const errorMessage =
         err instanceof Error ? err.message : "An error occurred";
       setError(errorMessage);
-      toast.error("❌ เกิดข้อผิดพลาด", errorMessage);
+      toast.error("เกิดข้อผิดพลาด", errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -134,7 +134,7 @@ function OcrPageContent() {
     <div suppressHydrationWarning className="h-screen bg-[#09090b] flex flex-col font-sans overflow-hidden">
       <Navbar />
 
-      <main className="flex-1 flex pt-16 overflow-hidden">
+      <main className="flex-1 flex pt-13 overflow-hidden">
         <ConfigPanel
           options={options}
           setOptions={setOptions}

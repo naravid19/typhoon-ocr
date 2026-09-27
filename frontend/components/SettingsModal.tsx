@@ -131,16 +131,16 @@ export function SettingsModal({ isOpen, onClose, onSave }: SettingsModalProps) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-0">
       <div 
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
+        className="absolute inset-0 bg-black/70 backdrop-blur-xs transition-opacity"
         onClick={onClose}
       />
       
-      <div className="relative w-full max-w-md overflow-hidden rounded-2xl bg-[#09090b] border border-white/10 shadow-2xl shadow-violet-900/10 animate-in fade-in zoom-in-95 duration-200">
+      <div className="relative w-full max-w-md overflow-hidden rounded-xl bg-[#121215] border border-white/[0.08] shadow-2xl animate-in fade-in zoom-in-95 duration-150">
         
-        <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 bg-zinc-900/50">
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-white/[0.08] bg-zinc-950/60">
           <div>
-            <h2 className="text-lg font-semibold text-white">Settings</h2>
-            <p className="text-xs text-zinc-400">Configure your API credentials and model</p>
+            <h2 className="text-sm font-semibold text-zinc-100">Environment Settings</h2>
+            <p className="text-[11px] text-zinc-400">Configure API credentials and inference model</p>
           </div>
           <button 
             onClick={onClose}
@@ -195,22 +195,22 @@ export function SettingsModal({ isOpen, onClose, onSave }: SettingsModalProps) {
           )}
         </div>
 
-        <div className="px-6 py-4 border-t border-white/10 bg-zinc-900/50 flex justify-end gap-3">
+        <div className="px-5 py-3 border-t border-white/[0.08] bg-zinc-950/60 flex justify-end gap-2.5">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-sm font-medium text-zinc-300 hover:text-white transition-colors"
+            className="px-3.5 py-1.5 text-xs font-medium text-zinc-400 hover:text-white transition-colors"
           >
             Cancel
           </button>
           <button
             onClick={handleSave}
             disabled={isLoading || isSaving || isSuccess}
-            className="flex items-center gap-2 px-5 py-2 text-sm font-medium text-white bg-violet-600 hover:bg-violet-500 active:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-all"
+            className="btn-primary py-1.5 px-4 text-xs font-medium flex items-center gap-1.5"
           >
             {isSaving ? (
               <>
-                <Loader2 size={16} className="animate-spin" />
-                Saving...
+                <Loader2 size={13} className="animate-spin" />
+                <span>Saving...</span>
               </>
             ) : (
               "Save Changes"
