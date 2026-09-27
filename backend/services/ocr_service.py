@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Any, Callable, List, Optional, Tuple
 
 from dotenv import load_dotenv
-from openai import APIConnectionError, APITimeoutError, AsyncOpenAI
+from openai import APIConnectionError, APIStatusError, APITimeoutError, AsyncOpenAI
 from pypdf import PdfReader
 
 import typhoon_ocr.ocr_utils
@@ -67,6 +67,16 @@ def _apply_windows_patches() -> None:
     Applies a monkey patch to fix Windows encoding issues with pdfinfo.
     """
     def patched_get_pdf_media_box_width_height(local_pdf_path: str, page_num: int) -> Tuple[float, float]:
+        from typhoon_ocr.pdf_utils import pdf_utils_available
+        if not pdf_utils_available:
+            raise ImportError(
+                "PDF utilities are not available. "
+                "Installation instructions for Poppler utilities:\n"
+                "- macOS: Run 'brew install poppler'\n"
+                "- Ubuntu/Debian: Run 'apt-get install poppler-utils'\n"
+                "- Windows: Install from https://github.com/oschwartz10612/poppler-windows/releases/ and add to PATH"
+            )
+
         command = [
             "pdfinfo", "-f", str(page_num), "-l", str(page_num), "-box",
             "-enc", "UTF-8", local_pdf_path
@@ -136,6 +146,13 @@ class TyphoonOCRService:
                 if attempt == self.config.MAX_RETRIES - 1:
                     raise e
                 await asyncio.sleep(2 ** attempt)
+            except APIStatusError as e:
+                if e.status_code in [408, 429, 500, 502, 503, 504]:
+                    if attempt == self.config.MAX_RETRIES - 1:
+                        raise e
+                    await asyncio.sleep(2 ** attempt)
+                else:
+                    raise e
             except Exception as e:
                 raise e
 
@@ -201,6 +218,7 @@ class TyphoonOCRService:
         temperature: Optional[float] = None,
         top_p: Optional[float] = None,
         repetition_penalty: Optional[float] = None,
+        figure_language: str = "Thai",
     ) -> Tuple[OcrPageResult, int]:
         """
         Process a single page asynchronously and return page result with token usage.
@@ -208,7 +226,12 @@ class TyphoonOCRService:
         _max_tokens = max_tokens or self.config.MAX_TOKENS
         _temperature = temperature if temperature is not None else self.config.TEMPERATURE
         _top_p = top_p if top_p is not None else self.config.TOP_P
-        _repetition_penalty = repetition_penalty if repetition_penalty is not None else self.config.REPETITION_PENALTY
+        if repetition_penalty is not None:
+            _repetition_penalty = repetition_penalty
+        elif task_type == "v1.5":
+            _repetition_penalty = 1.1
+        else:
+            _repetition_penalty = self.config.REPETITION_PENALTY
         resolved_model = self._resolve_model_name(model)
 
         try:
@@ -219,7 +242,8 @@ class TyphoonOCRService:
                 task_type,
                 self.config.IMAGE_DIM,
                 self.config.TEXT_LENGTH,
-                page_num
+                page_num,
+                figure_language,
             )
 
             image_base64 = self._extract_image_base64(messages)
@@ -273,6 +297,7 @@ class TyphoonOCRService:
         temperature: Optional[float] = None,
         top_p: Optional[float] = None,
         repetition_penalty: Optional[float] = None,
+        figure_language: str = "Thai",
     ) -> OcrResult:
         """
         Main processing function for OCR, running page tasks concurrently.
@@ -308,7 +333,8 @@ class TyphoonOCRService:
                     max_tokens=max_tokens,
                     temperature=temperature,
                     top_p=top_p,
-                    repetition_penalty=repetition_penalty
+                    repetition_penalty=repetition_penalty,
+                    figure_language=figure_language,
                 )
 
         tasks = [asyncio.create_task(_process_page(p)) for p in target_pages]

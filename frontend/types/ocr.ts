@@ -1,4 +1,5 @@
 export type OcrTaskType = "default" | "structure" | "v1.5";
+export type FigureLanguage = "Thai" | "English";
 
 export interface OcrPageResult {
   page: number;
@@ -24,6 +25,7 @@ export interface OcrOptions {
   top_p: number;
   repetition_penalty: number;
   pages?: string; 
+  figure_language?: FigureLanguage;
 }
 
 export interface FileSlot {

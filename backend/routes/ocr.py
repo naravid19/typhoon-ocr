@@ -56,8 +56,9 @@ async def process_ocr(
     max_tokens: int = Form(default=16384, description="Maximum tokens"),
     temperature: float = Form(default=0.1, description="Temperature (0.0-1.0)"),
     top_p: float = Form(default=0.6, description="Top P (0.0-1.0)"),
-    repetition_penalty: float = Form(default=1.2, description="Repetition penalty"),
-    pages: Optional[str] = Form(default=None, description="Comma-separated page numbers (e.g., '1,2,3')")
+    repetition_penalty: Optional[float] = Form(default=None, description="Repetition penalty (defaults to 1.1 for v1.5, 1.2 for others)"),
+    pages: Optional[str] = Form(default=None, description="Comma-separated page numbers (e.g., '1,2,3')"),
+    figure_language: str = Form(default="Thai", description="Figure description language: Thai or English")
 ):
     """
     Process a document with Typhoon OCR.
@@ -120,7 +121,8 @@ async def process_ocr(
             max_tokens=max_tokens,
             temperature=temperature,
             top_p=top_p,
-            repetition_penalty=repetition_penalty
+            repetition_penalty=repetition_penalty,
+            figure_language=figure_language
         )
         
         # Convert to response model
@@ -161,7 +163,7 @@ async def list_models():
     ]
 
 
-@router.get("/api/page-count")
+@router.post("/api/page-count")
 async def get_page_count(
     file: UploadFile = File(..., description="PDF file to get page count")
 ):
@@ -193,8 +195,9 @@ async def process_ocr_stream(
     max_tokens: int = Form(default=16384, description="Maximum tokens"),
     temperature: float = Form(default=0.1, description="Temperature (0.0-1.0)"),
     top_p: float = Form(default=0.6, description="Top P (0.0-1.0)"),
-    repetition_penalty: float = Form(default=1.2, description="Repetition penalty"),
-    pages: Optional[str] = Form(default=None, description="Comma-separated page numbers")
+    repetition_penalty: Optional[float] = Form(default=None, description="Repetition penalty (defaults to 1.1 for v1.5, 1.2 for others)"),
+    pages: Optional[str] = Form(default=None, description="Comma-separated page numbers"),
+    figure_language: str = Form(default="Thai", description="Figure description language: Thai or English")
 ):
     """
     Process a document with Typhoon OCR and stream progress via SSE.
@@ -286,7 +289,8 @@ async def process_ocr_stream(
                         max_tokens=max_tokens,
                         temperature=temperature,
                         top_p=top_p,
-                        repetition_penalty=repetition_penalty
+                        repetition_penalty=repetition_penalty,
+                        figure_language=figure_language,
                     )
 
             # Queue all tasks for concurrent processing

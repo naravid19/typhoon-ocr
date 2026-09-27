@@ -109,9 +109,9 @@ raw_web/
 # *.jpg
 # *.jpeg
 # !images/screenshot.png
-test_pdf_processing.py
 /backend/tests
 /docs
 /todos
 AGENTS.md
-AGENTS.md
+/resource
+CONTEXT.md

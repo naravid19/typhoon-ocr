@@ -2,7 +2,7 @@ import sys
 import shutil
 from pathlib import Path
 from fastapi.testclient import TestClient
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 # Add backend to path
@@ -43,7 +43,7 @@ def test_ocr_endpoint_mock(mock_get_service):
     
     # Setup mock
     mock_service_instance = MagicMock()
-    mock_service_instance.process_document.return_value = OcrResult(
+    mock_service_instance.process_document = AsyncMock(return_value=OcrResult(
         success=True,
         results=[
             OcrPageResult(page=1, success=True, text="Test OCR result", image_base64="base64data", error=None)
@@ -51,7 +51,7 @@ def test_ocr_endpoint_mock(mock_get_service):
         total_tokens=100,
         processing_time=1.5,
         error=None
-    )
+    ))
     mock_get_service.return_value = mock_service_instance
 
     # Create dummy file
@@ -86,7 +86,7 @@ def test_ocr_endpoint_accepts_v15_task_type(mock_get_service):
     from services.ocr_service import OcrResult, OcrPageResult
 
     mock_service_instance = MagicMock()
-    mock_service_instance.process_document.return_value = OcrResult(
+    mock_service_instance.process_document = AsyncMock(return_value=OcrResult(
         success=True,
         results=[
             OcrPageResult(page=1, success=True, text="v1.5 output", image_base64="", error=None)
@@ -94,7 +94,7 @@ def test_ocr_endpoint_accepts_v15_task_type(mock_get_service):
         total_tokens=42,
         processing_time=0.8,
         error=None
-    )
+    ))
     mock_get_service.return_value = mock_service_instance
 
     files = {'file': ('test.pdf', b'dummy content', 'application/pdf')}

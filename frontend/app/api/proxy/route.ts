@@ -1,4 +1,40 @@
 import { NextResponse } from 'next/server';
+import dns from 'dns/promises';
+import net from 'net';
+
+function isPrivateIp(ip: string): boolean {
+  if (ip === '127.0.0.1' || ip === '::1' || ip === '0.0.0.0') return true;
+
+  if (net.isIPv4(ip)) {
+    const parts = ip.split('.').map(Number);
+    // 10.0.0.0/8
+    if (parts[0] === 10) return true;
+    // 172.16.0.0/12
+    if (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) return true;
+    // 192.168.0.0/16
+    if (parts[0] === 192 && parts[1] === 168) return true;
+    // 127.0.0.0/8
+    if (parts[0] === 127) return true;
+    // 169.254.0.0/16 (link-local, cloud metadata)
+    if (parts[0] === 169 && parts[1] === 254) return true;
+    // 0.0.0.0/8
+    if (parts[0] === 0) return true;
+    return false;
+  }
+
+  if (net.isIPv6(ip)) {
+    const lower = ip.toLowerCase();
+    if (lower === '::1' || lower === '0:0:0:0:0:0:0:1') return true;
+    if (lower.startsWith('fc') || lower.startsWith('fd')) return true;
+    if (lower.startsWith('fe80')) return true;
+    if (lower.startsWith('::ffff:')) {
+      const ipv4Part = ip.substring(7);
+      return isPrivateIp(ipv4Part);
+    }
+  }
+
+  return false;
+}
 
 export async function POST(request: Request) {
   try {
@@ -26,6 +62,37 @@ export async function POST(request: Request) {
     if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
       return NextResponse.json(
         { error: 'Only HTTP and HTTPS URLs are supported' },
+        { status: 400 }
+      );
+    }
+
+    // Block obvious local hostnames immediately
+    const lowerHostname = parsedUrl.hostname.toLowerCase();
+    if (
+      lowerHostname === 'localhost' ||
+      lowerHostname.endsWith('.local') ||
+      lowerHostname.endsWith('.internal')
+    ) {
+      return NextResponse.json(
+        { error: 'Access to private or local network addresses is prohibited' },
+        { status: 403 }
+      );
+    }
+
+    // Resolve DNS and reject private/loopback IP addresses
+    try {
+      const lookup = await dns.lookup(parsedUrl.hostname, { all: true });
+      for (const entry of lookup) {
+        if (isPrivateIp(entry.address)) {
+          return NextResponse.json(
+            { error: 'Access to private or local network addresses is prohibited' },
+            { status: 403 }
+          );
+        }
+      }
+    } catch {
+      return NextResponse.json(
+        { error: 'Could not resolve host' },
         { status: 400 }
       );
     }

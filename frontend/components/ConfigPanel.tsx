@@ -494,6 +494,44 @@ export function ConfigPanel({
               </p>
             </div>
 
+            {options.task_type === "v1.5" && (
+              <div className="space-y-3 pt-2 border-t border-zinc-800/60 animate-in fade-in slide-in-from-top-1 duration-200">
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium text-zinc-300">Figure Description Language</label>
+                  <span className="text-[10px] text-zinc-500 font-mono">v1.5 &lt;figure&gt;</span>
+                </div>
+                <div className="flex p-1 bg-zinc-900 rounded-lg border border-zinc-800">
+                  <button
+                    type="button"
+                    onClick={() => handleChange("figure_language", "Thai")}
+                    className={cn(
+                      "flex-1 py-1.5 text-xs font-medium rounded transition-all cursor-pointer",
+                      (options.figure_language || "Thai") === "Thai"
+                        ? "bg-zinc-700 text-white shadow-sm"
+                        : "text-zinc-500 hover:text-zinc-300"
+                    )}
+                  >
+                    ภาษาไทย (Thai)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleChange("figure_language", "English")}
+                    className={cn(
+                      "flex-1 py-1.5 text-xs font-medium rounded transition-all cursor-pointer",
+                      options.figure_language === "English"
+                        ? "bg-zinc-700 text-white shadow-sm"
+                        : "text-zinc-500 hover:text-zinc-300"
+                    )}
+                  >
+                    English
+                  </button>
+                </div>
+                <p className="text-xs text-zinc-500 leading-relaxed">
+                  Language for detailed visual and chart descriptions generated inside <code className="text-violet-400 font-mono">&lt;figure&gt;</code> tags.
+                </p>
+              </div>
+            )}
+
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <label className="text-sm text-zinc-400">Temperature</label>

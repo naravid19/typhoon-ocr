@@ -28,6 +28,9 @@ export async function processOcrWithProgress(
   if (options.pages) {
     formData.append("pages", options.pages);
   }
+  if (options.figure_language) {
+    formData.append("figure_language", options.figure_language);
+  }
 
   // Use relative path for production or full path for dev
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8345";
@@ -64,8 +67,14 @@ export async function processOcrWithProgress(
 
       if (line.startsWith("data: ")) {
         const jsonStr = line.replace("data: ", "").trim();
+        let progress: OcrProgress | null = null;
         try {
-          const progress = JSON.parse(jsonStr) as OcrProgress;
+          progress = JSON.parse(jsonStr) as OcrProgress;
+        } catch (e) {
+          console.error("Failed to parse SSE data", e);
+        }
+
+        if (progress) {
           onProgress(progress);
 
           if (progress.type === "complete") {
@@ -76,8 +85,6 @@ export async function processOcrWithProgress(
           if (progress.type === "error") {
             throw new Error(progress.message || "Unknown error during OCR streaming");
           }
-        } catch (e) {
-          console.error("Failed to parse SSE data", e);
         }
       }
     }
@@ -88,7 +95,7 @@ export async function processOcrWithProgress(
 
 export function generateCode(language: string, file: File | null, options: OcrOptions): string {
   const filename = file?.name || "document.pdf";
-  const { model, task_type, max_tokens, temperature, top_p, repetition_penalty, pages } = options;
+  const { model, task_type, max_tokens, temperature, top_p, repetition_penalty, pages, figure_language } = options;
 
   if (language === "python") {
     return `import requests
@@ -101,7 +108,8 @@ data = {
     "max_tokens": ${max_tokens},
     "temperature": ${temperature},
     "top_p": ${top_p},
-    "repetition_penalty": ${repetition_penalty}${pages ? `,
+    "repetition_penalty": ${repetition_penalty}${figure_language ? `,
+    "figure_language": "${figure_language}"` : ""}${pages ? `,
     "pages": "${pages}"` : ""}
 }
 
@@ -117,7 +125,8 @@ print(response.json())`;
   -F "max_tokens=${max_tokens}" \\
   -F "temperature=${temperature}" \\
   -F "top_p=${top_p}" \\
-  -F "repetition_penalty=${repetition_penalty}"${pages ? ` \\
+  -F "repetition_penalty=${repetition_penalty}"${figure_language ? ` \\
+  -F "figure_language=${figure_language}"` : ""}${pages ? ` \\
   -F "pages=${pages}"` : ""}`;
   }
 
@@ -129,8 +138,9 @@ formData.append("task_type", "${task_type}");
 formData.append("max_tokens", "${max_tokens}");
 formData.append("temperature", "${temperature}");
 formData.append("top_p", "${top_p}");
-formData.append("repetition_penalty", "${repetition_penalty}")${pages ? `;
-formData.append("pages", "${pages}")` : ""};
+formData.append("repetition_penalty", "${repetition_penalty}");${figure_language ? `
+formData.append("figure_language", "${figure_language}");` : ""}${pages ? `
+formData.append("pages", "${pages}");` : ""}
 
 fetch("http://localhost:8345/api/ocr", {
   method: "POST",

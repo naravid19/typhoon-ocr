@@ -38,6 +38,7 @@ function OcrPageContent() {
     top_p: 0.6,
     repetition_penalty: 1.1,
     pages: "",
+    figure_language: "Thai",
   });
 
   const updateSlot = useCallback(
