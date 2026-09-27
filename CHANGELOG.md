@@ -5,15 +5,37 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [v1.1.2] - 2026-09-27
 
 ### Added
+- **Typhoon OCR 1.5 Architecture Alignment**: Full support for official Typhoon OCR 1.5 (`typhoon-ocr`) endpoint featuring unified single-prompt Markdown extraction, LaTeX formula parsing, and HTML table structuring.
+- **Figure Analysis Language Control (`figure_language`)**: Configurable figure description language (`th` / `en`) for Typhoon OCR 1.5 image and diagram explanations, exposed via backend API (`/api/ocr`, `/api/ocr/stream`) and frontend configuration panel.
+- **Dynamic Model Discovery (`/api/models`)**: Backend endpoint returning all available models (`typhoon-ocr` 1.5 2B, `typhoon-ocr-preview` v1 7B, and custom `.env` models), dynamically synced with the UI and Settings modal.
+- **Rich HTML & Figure Rendering**: Integrated `rehype-raw` into ReactMarkdown to natively render embedded HTML `<table>`, `<figure>`, and `<page_number>` elements with custom responsive styling and violet callout cards.
 - **Smart OCR Resume & Retry Logic**: Enhanced the processing queue to automatically filter out successful files. When rate limits (HTTP 429) or errors occur, the UI transforms into a "Retry OCR on X remaining files" button, allowing users to seamlessly resume failed tasks without removing completed ones.
-- **Configurable Max Upload Limit**: Added `TYPHOON_MAX_FILES` configuration (default: 10) dynamically linked between the backend (`.env`) and frontend, adjustable via the in-app Settings UI.
+- **Configurable Max Upload Limit**: Added `TYPHOON_MAX_FILES` configuration (default: 10) dynamically linked between backend (`.env`) and frontend, adjustable via the in-app Settings UI.
+- **Architectural Decision Records (ADRs)**: Documented architectural choices in `docs/adr/0001-poppler-windows-monkey-patch.md` and `docs/adr/0002-ssrf-mitigation-in-proxy.md`.
+
+### Changed
+- **Default Task Type & Model**: Updated default task type to `v1.5` and default model to `typhoon-ocr` (Typhoon OCR 1.5 2B) across backend and frontend.
+- **Contextual Task Selection UI**: The configuration panel now adaptively displays the v1.5 unified pipeline description when `typhoon-ocr` is selected, and reveals legacy `default` vs `structure` anchor text controls only when a legacy preview model is selected.
+- **Dynamic Repetition Penalty Defaults**: Automatically defaults to `1.05` for Typhoon OCR 1.5 and `1.2` for legacy v1 preview.
+- **Code Generator Accuracy**: Updated Python, cURL, and JavaScript snippet generators in `frontend/lib/api.ts` to include `figure_language` only when `task_type === "v1.5"`.
+- **Page Count Endpoint**: Changed `/api/page-count` from `GET` to `POST` to handle file payload inquiries reliably without 405 Method Not Allowed errors.
+- **Standardized Backend Port (8345)**: Aligned npm scripts (`package.json`) and API URL fallbacks to port `8345`.
+
+### Security
+- **SSRF Mitigation on URL Import Proxy ([ADR 0002](docs/adr/0002-ssrf-mitigation-in-proxy.md))**: Hardened `/api/proxy` against Server-Side Request Forgery with strict DNS resolution and CIDR filtering against loopback (`127.0.0.0/8`, `::1`), private networks (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`), link-local/cloud metadata (`169.254.0.0/16`), IPv4/IPv6 multicast and broadcast ranges, returning HTTP 400 Bad Request.
 
 ### Fixed
+- **API Resilience & Automatic Retries**: Added automatic exponential backoff retries in `backend/services/ocr_service.py` for transient API status codes (`408`, `429`, `500`, `502`, `503`, `504`).
+- **Windows Poppler Monkey Patch ([ADR 0001](docs/adr/0001-poppler-windows-monkey-patch.md))**: Added runtime check for `pdfinfo` availability before applying the `pdf2image` monkey patch, preventing unnecessary work when Poppler is in system PATH.
+- **Model Compatibility Guardrail**: Added guardrail in `_resolve_model_and_task_type` locking `task_type="v1.5"` for `typhoon-ocr` to prevent legacy anchor text prompting from contaminating the 1.5 model.
+- **Tailwind Figure Child Styling**: Replaced non-standard `not-italic-children` class with Tailwind arbitrary variant `[&>*]:not-italic` in `ResponsePanel.tsx`.
+- **SSE Stream Error Handling**: Fixed silent stream completion on errors in `frontend/lib/api.ts` so error payloads throw properly to update UI error states.
+- **Backend Test Suite Mocks**: Fixed `AsyncMock` usage in `backend/tests/test_api.py`, achieving 100% test pass rate (112/112 tests).
 - **Port Conflict Mitigation**: Updated process management and documentation to handle scenarios where the default port might get stuck in use.
-- **ReferenceError on Settings Modal**: Fixed a missing `FileText` icon import causing UI crashes when viewing configuration.
+- **ReferenceError on Settings Modal**: Fixed missing `FileText` icon import causing UI crashes when viewing configuration.
 
 ## [v1.1.1] - 2026-08-08
 

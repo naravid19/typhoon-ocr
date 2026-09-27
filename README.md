@@ -73,16 +73,19 @@
 
 [![Product Name Screen Shot][product-screenshot]](https://github.com/naravid19/typhoon-ocr/images/screenshot.png)
 
-Typhoon OCR is a model for extracting structured markdown from images or PDFs. It supports document layout analysis and table extraction, returning results in markdown or HTML.
+Typhoon OCR is an advanced vision-language model for extracting structured markdown from images or PDFs. It excels at document layout analysis, table extraction, LaTeX mathematical equation parsing, and visual diagram understanding (`<figure>`).
 
 This fork provides a modern **Next.js web application** alongside the original Gradio demo, featuring:
 
 - 🚀 **Modern UI** with dark theme and premium aesthetics
-- 📄 **Multi-page PDF support** with interactive page selection
-- 🔗 **URL import** for loading documents directly from the web
-- 📊 **Real-time progress** indicators during OCR processing
-- 🤖 **Smart Resume & Retry**: Automatically filter successful files and retry only rate-limited or failed files (e.g., HTTP 429) without losing queue progress.
-- ⚙️ **Configurable Limits**: Dynamically adjust `MAX_FILES` directly via the in-app Settings panel.
+- 🤖 **Typhoon OCR 1.5 Architecture**: Official support for `typhoon-ocr` (2B) unified single-prompt model, alongside legacy `typhoon-ocr-preview` (7B) anchor-text pipeline
+- 📐 **LaTeX & Visual Diagram Analysis**: Extracts mathematical formulas and figures with configurable explanation language (`figure_language`: Thai / English)
+- 📊 **Rich Markdown & HTML Rendering**: Embedded `<table>`, `<figure>`, and `<page_number>` tags rendered natively with responsive styling
+- 📄 **Multi-page PDF support** with interactive page selection and viewport-based lazy loading
+- 🔗 **SSRF-Protected URL Import**: Secure document loading from remote URLs with DNS and CIDR filtering
+- 📈 **Real-time SSE progress** indicators during OCR processing
+- 🤖 **Smart Resume & Retry**: Automatically filter successful files and retry only rate-limited or failed files (e.g., HTTP 429) without losing queue progress
+- ⚙️ **Dynamic Model Discovery & Limits**: Dynamically discover models (`/api/models`) and adjust `MAX_FILES` directly via the in-app Settings panel
 - 🎨 **Compare mode** to view original and extracted text side-by-side
 - 🔄 **In-App Auto-Update**: Safe one-click GitHub update (`git pull`) with sanitized parameter checking
 - 🎨 **Design System**: Structured visual standards (`PRODUCT.md`) based on `impeccable` and `ui-ux-pro-max` guidelines
@@ -145,7 +148,13 @@ pdftoppm -v
    TYPHOON_BASE_URL=https://api.opentyphoon.ai/v1
    TYPHOON_API_KEY=YOUR_API_KEY
    TYPHOON_OCR_MODEL=typhoon-ocr
+   # Optional settings
+   TYPHOON_MAX_FILES=10
    ```
+
+   > **Supported Models:**
+   > - `typhoon-ocr`: Official Typhoon OCR 1.5 (2B) — unified single-prompt architecture (Markdown, LaTeX, tables, figures). **(Default & Recommended)**
+   > - `typhoon-ocr-preview`: Legacy Typhoon OCR v1 (7B) — anchor-text prompting (`default` vs `structure`).
 
 3. **Set up Backend (Python)**
 
@@ -209,20 +218,24 @@ pdftoppm -v
 ## Features
 
 - ✅ Upload PDF or images (PNG, JPG, WebP)
+- 🚀 **Typhoon OCR 1.5 Integration**: Unified single-prompt extraction for Markdown, LaTeX equations, and HTML tables
+- 🖼️ **Figure Visual Analysis**: Configurable figure description language (`th` / `en`) for diagram and illustration breakdowns
+- 🎯 **Dynamic Model Discovery**: Live model list synced between backend `/api/models` and frontend UI (`typhoon-ocr` 1.5 2B, `typhoon-ocr-preview` v1 7B, and custom models)
 - 🚀 **Multi-File Batch OCR**: Upload & queue up to 10 documents simultaneously
 - ⚡ **Sliding Window Concurrent Engine**: Process multiple files in parallel with low memory footprint
 - ✅ Multi-page PDF selection with visual grid preview & **viewport-based lazy loading** (prevents memory lag)
-- ✅ Import documents from URL (with CORS proxy & robust MIME fallback)
-- ✅ Shift-click for range selection
-- ✅ Quick actions: Select All, Odd/Even pages, Custom range
-- ✅ Two task types: `default` (Markdown) and `structure` (HTML tables)
-- ⚡ **Lightning Fast Asynchronous Backend** processing pages concurrently
+- 🛡️ **SSRF-Hardened URL Import**: Safe web document import with multi-layer IP/DNS filtering ([ADR 0002](docs/adr/0002-ssrf-mitigation-in-proxy.md))
+- 🔄 **Automatic API Retries**: Resilient exponential backoff handling of rate limits (HTTP 429) and transient server errors
+- 🪟 **Windows Poppler Auto-Fallback**: Seamless PDF rendering on Windows without manual PATH configuration ([ADR 0001](docs/adr/0001-poppler-windows-monkey-patch.md))
+- ✅ Shift-click for range selection & quick actions (Select All, Odd/Even pages, Custom range)
+- ⚡ **Lightning Fast Asynchronous Backend** processing pages concurrently via `asyncio`
 - ⚡ **Progressive Page Rendering**: Render multi-page markdown outputs smoothly without freezing the UI
+- 📊 **Native Table & Figure Rendering**: Embedded HTML `<table>` and `<figure>` tags rendered cleanly via `rehype-raw`
 - ✅ Real-time progress indicator per file with live status badges
 - ✅ Tabbed results navigation with "+X more" overflow dropdown
 - ✅ Compare mode: Original image vs. extracted text
 - 📦 **Flexible Export Options**: Copy text/markdown (per-file or merged) & Download `.md` or `.zip` archives (with filename deduplication)
-- ✅ Code generator for API integration
+- ✅ Code generator for API integration (Python, cURL, JavaScript)
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -232,12 +245,15 @@ pdftoppm -v
 
 - [x] Modern Next.js frontend
 - [x] Multi-page PDF selection with preview
-- [x] URL import with proxy
-- [x] Progress indicators
+- [x] URL import with SSRF-protected proxy
+- [x] Progress indicators with Server-Sent Events (SSE)
 - [x] Compare view mode
 - [x] **Asynchronous/Concurrent OCR processing**
 - [x] **Batch multi-file processing (up to 10 files)**
 - [x] **Export to Markdown (`.md`) and ZIP archives (`.zip`) (per-file & merged)**
+- [x] **Typhoon OCR 1.5 Architecture Alignment (Single-prompt, LaTeX, Figure analysis, HTML tables)**
+- [x] **Dynamic model discovery and contextual configuration**
+- [x] **API retry resilience & Windows Poppler auto-fallback**
 - [ ] Support for more document types
 
 See the [open issues](https://github.com/naravid19/typhoon-ocr/issues) for a full list of proposed features (and known issues).
