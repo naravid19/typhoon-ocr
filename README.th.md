@@ -78,7 +78,7 @@ Typhoon OCR คือโมเดลวิชันภาษาขั้นส�
 
 Fork นี้มาพร้อมกับ **เว็บแอปพลิเคชัน Next.js** ที่ทันสมัย นอกเหนือจาก Gradio demo ดั้งเดิม ประกอบด้วย:
 
-- 🎛️ **ดีไซน์ Precision Studio Dark UI**: สตูดิโอธีมสี Obsidian ระดับ Enterprise (`#09090b`), ขอบคมชัด 1px ไร้แสงฟุ้ง (no neon blur glow), โทนสีม่วง Typhoon Violet (`#8b5cf6`), และตัด Emoji ออกจาก UI Chrome ทั้งหมด ([ADR 0003](docs/adr/0003-unified-studio-workspace-and-design-system.md), [DESIGN.md](DESIGN.md))
+- 🎛️ **ดีไซน์ Precision Studio Dark UI**: สตูดิโอธีมสี Obsidian ระดับ Enterprise (`#09090b`), ขอบคมชัด 1px ไร้แสงฟุ้ง (no neon blur glow), โทนสีม่วง Typhoon Violet (`#8b5cf6`), และตัด Emoji ออกจาก UI Chrome ทั้งหมด
 - 📑 **Unified Sidebar**: รวมขั้นตอนการจัดการคิวเอกสารและปรับพารามิเตอร์ไว้ในแถบเดียว ไม่ต้องสลับแท็บไปมา พร้อม Dropzone ที่ย่อขนาดเป็นแถบกะทัดรัดเมื่อมีไฟล์
 - 🪟 **Resizable Compare Workbench**: โต๊ะทำงานเปรียบเทียบผลลัพธ์แบบปรับขนาดได้อิสระ (Draggable Split 22%–78%), ปรับโหมดซูม Fit หรือ 100% ขนาดจริง, และปุ่มลัดสลับหน้าเอกสาร (`P.1`, `P.2`...)
 - 🚀 **สคริปต์รันแอปเสถียรภาพสูง (`start_app.bat`)**: สคริปต์ CLI ทำงาน 4 ขั้นตอน ตรวจสอบพอร์ต 8345 และ 3000 ล่วงหน้า ป้องกันหน้าต่างเด้งปิดหาย
@@ -86,7 +86,7 @@ Fork นี้มาพร้อมกับ **เว็บแอปพลิเ
 - 📐 **รองรับสมการ LaTeX และวิเคราะห์รูปภาพ**: ถอดสมการคณิตศาสตร์และอธิบายรูปภาพ/แผนภูมิ พร้อมเลือกภาษาคำอธิบายได้ (`figure_language`: ไทย / อังกฤษ)
 - 📊 **แสดงผล Markdown & HTML สมบูรณ์แบบ**: เรนเดอร์แท็ก `<table>`, `<figure>`, และ `<page_number>` อย่างสวยงามเป็นระเบียบ
 - 📄 **รองรับ PDF หลายหน้า** พร้อมการเลือกหน้าแบบอินเทอร์แอคทีฟและระบบ Lazy Loading
-- 🔗 **นำเข้าจาก URL ปลอดภัยสูง**: ป้องกันการโจมตี Server-Side Request Forgery (SSRF) ด้วยการตรวจสอบ DNS และ IP เครือข่ายภายใน ([ADR 0002](docs/adr/0002-ssrf-mitigation-in-proxy.md))
+- 🔗 **นำเข้าจาก URL ปลอดภัยสูง**: ป้องกันการโจมตี Server-Side Request Forgery (SSRF) ด้วยการตรวจสอบ DNS และ IP เครือข่ายภายใน
 - 📈 **แสดงความคืบหน้าแบบเรียลไทม์** (Server-Sent Events) พร้อมตัวจับเวลา Elapsed Latency ขณะประมวลผล OCR
 - 🤖 **ระบบอัจฉริยะ Smart Resume & Auto-Retry**: กดปุ่มเดิมเพื่อรันต่อเฉพาะไฟล์ที่ติด Error (เช่น Rate Limit HTTP 429) โดยไม่ต้องเริ่มใหม่ทั้งหมด
 - ⚙️ **ดึงโมเดลอัตโนมัติและตั้งค่าขีดจำกัดไฟล์**: ค้นหาโมเดลที่ใช้งานได้อัตโนมัติ (`/api/models`) พร้อมปรับแก้ `MAX_FILES` ได้ผ่านหน้า Settings
@@ -273,9 +273,9 @@ pdftoppm -v
 - 🚀 **รองรับการประมวลผลหลายไฟล์พร้อมกัน (Multi-File Batch OCR)**: อัปโหลด & จัดคิวได้สูงสุด 10 ไฟล์
 - ⚡ **ระบบประมวลผลแบบ Sliding Window Concurrent**: รันพร้อมกันสูงสุด 3 ไฟล์ ประหยัดทรัพยากรเครื่อง ไม่ค้าง
 - ✅ เลือกหลายหน้า PDF พร้อมพรีวิวแบบ grid & **ระบบ Lazy Loading ตามมุมมองสายตา** (ป้องกันคอมพิวเตอร์ค้าง)
-- 🛡️ **ระบบนำเข้าจาก URL ป้องกัน SSRF**: ปลอดภัยสูงด้วยการคัดกรอง IP ภายในและมัลติคาสต์ ([ADR 0002](docs/adr/0002-ssrf-mitigation-in-proxy.md))
+- 🛡️ **ระบบนำเข้าจาก URL ป้องกัน SSRF**: ปลอดภัยสูงด้วยการคัดกรอง IP ภายในและมัลติคาสต์
 - 🔄 **ระบบลองใหม่อัตโนมัติ (API Retry)**: ทำงานต่ออัตโนมัติเมื่อติด Rate Limit (HTTP 429) หรือเซิร์ฟเวอร์ขัดข้องชั่วคราว
-- 🪟 **ระบบจัดการ Poppler บน Windows อัตโนมัติ**: ประมวลผล PDF บน Windows ได้ราบรื่นแม้ไม่ได้ตั้ง PATH ([ADR 0001](docs/adr/0001-poppler-windows-monkey-patch.md))
+- 🪟 **ระบบจัดการ Poppler บน Windows อัตโนมัติ**: ประมวลผล PDF บน Windows ได้ราบรื่นแม้ไม่ได้ตั้ง PATH
 - ✅ กด Shift+คลิกเพื่อเลือกช่วงหน้า & ปุ่มลัด (เลือกทั้งหมด, หน้าคี่/คู่, ช่วงกำหนดเอง)
 - ⚡ **ประมวลผลความเร็วสูง (Asynchronous)** ดึงข้อมูลหลายหน้าพร้อมกันผ่าน `asyncio`
 - ⚡ **ระบบ Progressive Page Rendering**: แสดงผล Markdown หลายหน้าอย่างราบรื่น ไม่กระตุก
@@ -303,7 +303,7 @@ pdftoppm -v
 - [x] **สถาปัตยกรรม Typhoon OCR 1.5 เต็มรูปแบบ (Single-prompt, LaTeX, รูปภาพ, ตาราง HTML)**
 - [x] **ค้นพบโมเดลแบบไดนามิกและปรับแต่งค่าตามบริบทโมเดล**
 - [x] **ระบบคืนสภาพอัตโนมัติ (API Retry) และจัดการ Poppler Windows**
-- [x] **ดีไซน์ Precision Studio Dark UI และ Resizable Compare Workbench ([ADR 0003](docs/adr/0003-unified-studio-workspace-and-design-system.md))**
+- [x] **ดีไซน์ Precision Studio Dark UI และ Resizable Compare Workbench**
 - [x] **Unified Sidebar Workspace รวมคิวไฟล์และการตั้งค่าไว้ในแถบเดียว**
 - [x] **ปรับปรุงสคริปต์รันแอปบน Windows (`start_app.bat`) ให้เสถียรและปลอดภัย**
 - [ ] รองรับเอกสารประเภทอื่นเพิ่มเติม

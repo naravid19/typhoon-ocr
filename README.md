@@ -78,7 +78,7 @@ Typhoon OCR is an advanced vision-language model for extracting structured markd
 
 This fork provides a modern **Next.js web application** alongside the original Gradio demo, featuring:
 
-- 🎛️ **Precision Studio Dark UI**: Enterprise Obsidian theme (`#09090b`), tactile surfaces, 1px subtle borders, disciplined Typhoon Violet accent (`#8b5cf6`), and zero emoji noise in UI chrome ([ADR 0003](docs/adr/0003-unified-studio-workspace-and-design-system.md), [DESIGN.md](DESIGN.md))
+- 🎛️ **Precision Studio Dark UI**: Enterprise Obsidian theme (`#09090b`), tactile surfaces, 1px subtle borders, disciplined Typhoon Violet accent (`#8b5cf6`), and zero emoji noise in UI chrome
 - 📑 **Unified Sidebar**: Document ingestion and inference parameter controls consolidated into a single vertical scrollable sidebar—eliminating context-switching tabs
 - 🪟 **Resizable Compare Workbench**: Interactive draggable split divider (22%–78%), Fit vs 100% natural resolution zoom controls, and quick page hopping filmstrip pills (`P.1`, `P.2`...)
 - 🚀 **Hardened CLI Launcher (`start_app.bat`)**: 4-phase diagnostic startup, port 8345 & 3000 conflict detection, safe ping delay, hoisted dependency cache check, and exit pause
@@ -86,7 +86,7 @@ This fork provides a modern **Next.js web application** alongside the original G
 - 📐 **LaTeX & Visual Diagram Analysis**: Extracts mathematical formulas and figures with configurable explanation language (`figure_language`: Thai / English)
 - 📊 **Rich Markdown & HTML Rendering**: Embedded `<table>`, `<figure>`, and `<page_number>` tags rendered natively with responsive styling
 - 📄 **Multi-page PDF support** with interactive page selection and viewport-based lazy loading
-- 🔗 **SSRF-Protected URL Import**: Secure document loading from remote URLs with DNS and CIDR filtering ([ADR 0002](docs/adr/0002-ssrf-mitigation-in-proxy.md))
+- 🔗 **SSRF-Protected URL Import**: Secure document loading from remote URLs with multi-layer DNS and CIDR filtering
 - 📈 **Real-time SSE progress** indicators and elapsed latency timer during OCR processing
 - 🤖 **Smart Resume & Retry**: Automatically filter successful files and retry only rate-limited or failed files (e.g., HTTP 429) without losing queue progress
 - ⚙️ **Dynamic Model Discovery & Limits**: Dynamically discover models (`/api/models`) and adjust `MAX_FILES` directly via the in-app Settings panel
@@ -273,9 +273,9 @@ pdftoppm -v
 - 🚀 **Multi-File Batch OCR**: Upload & queue up to 10 documents simultaneously
 - ⚡ **Sliding Window Concurrent Engine**: Process multiple files in parallel with low memory footprint
 - ✅ Multi-page PDF selection with visual grid preview & **viewport-based lazy loading** (prevents memory lag)
-- 🛡️ **SSRF-Hardened URL Import**: Safe web document import with multi-layer IP/DNS filtering ([ADR 0002](docs/adr/0002-ssrf-mitigation-in-proxy.md))
+- 🛡️ **SSRF-Hardened URL Import**: Safe web document import with multi-layer IP/DNS filtering
 - 🔄 **Automatic API Retries**: Resilient exponential backoff handling of rate limits (HTTP 429) and transient server errors
-- 🪟 **Windows Poppler Auto-Fallback**: Seamless PDF rendering on Windows without manual PATH configuration ([ADR 0001](docs/adr/0001-poppler-windows-monkey-patch.md))
+- 🪟 **Windows Poppler Auto-Fallback**: Seamless PDF rendering on Windows without manual PATH configuration
 - ✅ Shift-click for range selection & quick actions (Select All, Odd/Even pages, Custom range)
 - ⚡ **Lightning Fast Asynchronous Backend** processing pages concurrently via `asyncio`
 - ⚡ **Progressive Page Rendering**: Render multi-page markdown outputs smoothly without freezing the UI
@@ -303,7 +303,7 @@ pdftoppm -v
 - [x] **Typhoon OCR 1.5 Architecture Alignment (Single-prompt, LaTeX, Figure analysis, HTML tables)**
 - [x] **Dynamic model discovery and contextual configuration**
 - [x] **API retry resilience & Windows Poppler auto-fallback**
-- [x] **Precision Studio Dark UI & Resizable Compare Workbench ([ADR 0003](docs/adr/0003-unified-studio-workspace-and-design-system.md))**
+- [x] **Precision Studio Dark UI & Resizable Compare Workbench**
 - [x] **Unified Sidebar Workspace with dynamic compact dropzone**
 - [x] **Hardened Windows CLI launcher (`start_app.bat`) with port conflict detection**
 - [ ] Support for more document types

@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [v1.1.2] - 2026-09-27
 
 ### Added
-- **Precision Studio Dark UI ([ADR 0003](docs/adr/0003-unified-studio-workspace-and-design-system.md), [DESIGN.md](DESIGN.md))**: Enterprise-grade Obsidian dark theme (`#09090b`), tactile 1px subtle borders, disciplined Typhoon Violet accent (`#8b5cf6`), and complete elimination of neon blur halos and emojis from UI chrome.
+- **Precision Studio Dark UI**: Enterprise-grade Obsidian dark theme (`#09090b`), tactile 1px subtle borders, disciplined Typhoon Violet accent (`#8b5cf6`), and complete elimination of neon blur halos and emojis from UI chrome.
 - **Unified Sidebar Workspace**: Consolidated document queue and inference parameters in `ConfigPanel` into a single vertical scrollable sidebar—eliminating tab switching. Added dynamic compact dropzone when files are queued, and automated page-filter guardrail for multi-file batches.
 - **Resizable Compare Workbench**: Interactive draggable split divider in `ResponsePanel` (supporting 22%–78% split ratios) between original document raster and extracted Markdown output, with Fit vs 100% natural resolution zoom controls, elapsed processing timer, and quick page hopping filmstrip pills (`P.1`, `P.2`...).
 - **Typhoon OCR 1.5 Architecture Alignment**: Full support for official Typhoon OCR 1.5 (`typhoon-ocr`) endpoint featuring unified single-prompt Markdown extraction, LaTeX formula parsing, and HTML table structuring.
@@ -17,7 +17,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Rich HTML & Figure Rendering**: Integrated `rehype-raw` into ReactMarkdown to natively render embedded HTML `<table>`, `<figure>`, and `<page_number>` elements with custom responsive styling and violet callout cards.
 - **Smart OCR Resume & Retry Logic**: Enhanced the processing queue to automatically filter out successful files. When rate limits (HTTP 429) or errors occur, the UI transforms into a "Retry OCR on X remaining files" button, allowing users to seamlessly resume failed tasks without removing completed ones.
 - **Configurable Max Upload Limit**: Added `TYPHOON_MAX_FILES` configuration (default: 10) dynamically linked between backend (`.env`) and frontend, adjustable via the in-app Settings UI.
-- **Architectural Decision Records (ADRs)**: Documented architectural choices in `docs/adr/0001-poppler-windows-monkey-patch.md`, `docs/adr/0002-ssrf-mitigation-in-proxy.md`, and `docs/adr/0003-unified-studio-workspace-and-design-system.md`.
 
 ### Changed
 - **Launcher CLI Modernization (`start_app.bat`)**: Re-engineered the Windows launcher script with a clean 4-phase CLI diagnostic format, port 8345 conflict and port 3000 in-use detection, safe ping delay, hoisted `node_modules` cache detection, strict CRLF encoding, and persistent pause prompts on completion and error to prevent the terminal window from closing prematurely.
@@ -31,13 +30,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Standardized Backend Port (8345)**: Aligned npm scripts (`package.json`) and API URL fallbacks to port `8345`.
 
 ### Security
-- **SSRF Mitigation on URL Import Proxy ([ADR 0002](docs/adr/0002-ssrf-mitigation-in-proxy.md))**: Hardened `/api/proxy` against Server-Side Request Forgery with strict DNS resolution and CIDR filtering against loopback (`127.0.0.0/8`, `::1`), private networks (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`), link-local/cloud metadata (`169.254.0.0/16`), IPv4/IPv6 multicast and broadcast ranges, returning HTTP 400 Bad Request.
+- **SSRF Mitigation on URL Import Proxy**: Hardened `/api/proxy` against Server-Side Request Forgery with strict DNS resolution and CIDR filtering against loopback (`127.0.0.0/8`, `::1`), private networks (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`), link-local/cloud metadata (`169.254.0.0/16`), IPv4/IPv6 multicast and broadcast ranges, returning HTTP 400 Bad Request.
 
 ### Fixed
 - **Windows Batch Parser Crash**: Resolved premature script termination in `start_app.bat` caused by unescaped parentheses in `if` blocks and Unix LF line endings.
 - **ResponsePanel Text Selection Scoping**: Scoped `select-none` to active drag events, ensuring text in tab bars, code generators, and telemetry remains selectable during idle state.
 - **API Resilience & Automatic Retries**: Added automatic exponential backoff retries in `backend/services/ocr_service.py` for transient API status codes (`408`, `429`, `500`, `502`, `503`, `504`).
-- **Windows Poppler Monkey Patch ([ADR 0001](docs/adr/0001-poppler-windows-monkey-patch.md))**: Added runtime check for `pdfinfo` availability before applying the `pdf2image` monkey patch, preventing unnecessary work when Poppler is in system PATH.
+- **Windows Poppler Monkey Patch**: Added runtime check for `pdfinfo` availability before applying the `pdf2image` monkey patch, preventing unnecessary work when Poppler is in system PATH.
 - **Model Compatibility Guardrail**: Added guardrail in `_resolve_model_and_task_type` locking `task_type="v1.5"` for `typhoon-ocr` to prevent legacy anchor text prompting from contaminating the 1.5 model.
 - **Tailwind Figure Child Styling**: Replaced non-standard `not-italic-children` class with Tailwind arbitrary variant `[&>*]:not-italic` in `ResponsePanel.tsx`.
 - **SSE Stream Error Handling**: Fixed silent stream completion on errors in `frontend/lib/api.ts` so error payloads throw properly to update UI error states.
