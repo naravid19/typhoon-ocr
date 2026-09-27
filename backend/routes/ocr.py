@@ -52,7 +52,7 @@ class ModelInfo(BaseModel):
 async def process_ocr(
     file: UploadFile = File(..., description="Image or PDF file to process"),
     model: str = Form(default="typhoon-ocr", description="Model to use"),
-    task_type: str = Form(default="default", description="Task type: default, structure, or v1.5"),
+    task_type: str = Form(default="v1.5", description="Task type: v1.5 (default), default, or structure"),
     max_tokens: int = Form(default=16384, description="Maximum tokens"),
     temperature: float = Form(default=0.1, description="Temperature (0.0-1.0)"),
     top_p: float = Form(default=0.6, description="Top P (0.0-1.0)"),
@@ -154,13 +154,29 @@ async def process_ocr(
 @router.get("/api/models", response_model=List[ModelInfo])
 async def list_models():
     """List available OCR models."""
-    return [
+    service = get_ocr_service()
+    models = [
         ModelInfo(
             id="typhoon-ocr",
-            name="Typhoon OCR",
-            description="Default OCR model for document processing"
+            name="Typhoon OCR 1.5 (2B)",
+            description="Latest & Recommended: Single-prompt layout-aware Markdown with Thai/English figure descriptions"
+        ),
+        ModelInfo(
+            id="typhoon-ocr-preview",
+            name="Typhoon OCR 1 (7B)",
+            description="Legacy model: Requires anchor text and supports default / structure modes"
         )
     ]
+    configured_model = (service.config.MODEL_NAME or "").strip()
+    if configured_model and configured_model not in [m.id for m in models]:
+        models.append(
+            ModelInfo(
+                id=configured_model,
+                name=f"Custom ({configured_model})",
+                description="Custom self-hosted vLLM or Ollama model configured in environment"
+            )
+        )
+    return models
 
 
 @router.post("/api/page-count")
@@ -191,7 +207,7 @@ async def get_page_count(
 async def process_ocr_stream(
     file: UploadFile = File(..., description="Image or PDF file to process"),
     model: str = Form(default="typhoon-ocr", description="Model to use"),
-    task_type: str = Form(default="default", description="Task type: default, structure, or v1.5"),
+    task_type: str = Form(default="v1.5", description="Task type: v1.5 (default), default, or structure"),
     max_tokens: int = Form(default=16384, description="Maximum tokens"),
     temperature: float = Form(default=0.1, description="Temperature (0.0-1.0)"),
     top_p: float = Form(default=0.6, description="Top P (0.0-1.0)"),

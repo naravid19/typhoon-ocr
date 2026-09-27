@@ -34,6 +34,12 @@ function getSlotStatusText(slot: FileSlot): string {
   return "pending";
 }
 
+export interface ModelOption {
+  id: string;
+  name: string;
+  description: string;
+}
+
 interface ConfigPanelProps {
   options: OcrOptions;
   setOptions: Dispatch<SetStateAction<OcrOptions>>;
@@ -74,22 +80,60 @@ export function ConfigPanel({
   const [showPageSelector, setShowPageSelector] = useState(true);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [maxFiles, setMaxFiles] = useState(10);
+  const [availableModels, setAvailableModels] = useState<ModelOption[]>([
+    {
+      id: "typhoon-ocr",
+      name: "Typhoon OCR 1.5 (2B)",
+      description: "Latest & Recommended: Single-prompt Markdown with Thai/English figure descriptions",
+    },
+    {
+      id: "typhoon-ocr-preview",
+      name: "Typhoon OCR 1 (7B)",
+      description: "Legacy model: Requires anchor text and supports default / structure modes",
+    }
+  ]);
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8345";
 
   const fetchEnvConfig = useCallback(async () => {
     try {
-      const response = await fetch(`${apiUrl}/api/env`);
-      if (response.ok) {
-        const { data } = await response.json();
+      const [envRes, modelsRes] = await Promise.allSettled([
+        fetch(`${apiUrl}/api/env`),
+        fetch(`${apiUrl}/api/models`)
+      ]);
+
+      if (envRes.status === "fulfilled" && envRes.value.ok) {
+        const { data } = await envRes.value.json();
         if (data.TYPHOON_MAX_FILES) {
           setMaxFiles(data.TYPHOON_MAX_FILES);
         }
+        if (data.TYPHOON_OCR_MODEL) {
+          const envModel = data.TYPHOON_OCR_MODEL.trim();
+          setOptions((prev) => {
+            if (!prev.model || prev.model === "typhoon-ocr") {
+              const isPreview = envModel.toLowerCase().includes("preview");
+              return {
+                ...prev,
+                model: envModel,
+                task_type: isPreview ? "structure" : "v1.5",
+                repetition_penalty: isPreview ? 1.2 : 1.1,
+              };
+            }
+            return prev;
+          });
+        }
+      }
+
+      if (modelsRes.status === "fulfilled" && modelsRes.value.ok) {
+        const modelsData = await modelsRes.value.json();
+        if (Array.isArray(modelsData) && modelsData.length > 0) {
+          setAvailableModels(modelsData);
+        }
       }
     } catch (error) {
-      console.error("Failed to fetch env config", error);
+      console.error("Failed to fetch env config or models", error);
     }
-  }, [apiUrl]);
+  }, [apiUrl, setOptions]);
 
   useEffect(() => {
     fetchEnvConfig();
@@ -150,6 +194,16 @@ export function ConfigPanel({
 
   const handleChange = (key: keyof OcrOptions, value: string | number) => {
     setOptions({ ...options, [key]: value });
+  };
+
+  const handleModelSelect = (selectedModelId: string) => {
+    const isLegacy = selectedModelId.toLowerCase().includes("preview");
+    setOptions((prev) => ({
+      ...prev,
+      model: selectedModelId,
+      task_type: isLegacy ? (prev.task_type === "v1.5" ? "structure" : prev.task_type) : "v1.5",
+      repetition_penalty: isLegacy ? 1.2 : 1.1,
+    }));
   };
 
   const handleTaskTypeChange = (taskType: OcrOptions["task_type"]) => {
@@ -248,12 +302,19 @@ export function ConfigPanel({
           <select 
             className="w-full appearance-none bg-zinc-900 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-zinc-200 focus:outline-none focus:border-violet-500 transition-colors cursor-pointer"
             value={options.model}
-            onChange={(e) => handleChange("model", e.target.value)}
+            onChange={(e) => handleModelSelect(e.target.value)}
           >
-            <option value="typhoon-ocr">Typhoon OCR (Default)</option>
+            {availableModels.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.name}
+              </option>
+            ))}
           </select>
           <ChevronRight className="absolute right-3 top-3 text-zinc-500 rotate-90 pointer-events-none" size={16} />
         </div>
+        <p className="text-[11px] text-zinc-500 mt-1.5 leading-snug line-clamp-1">
+          {availableModels.find((m) => m.id === options.model)?.description || "OCR model for document processing"}
+        </p>
       </div>
 
       {/* Tabs */}
@@ -454,82 +515,88 @@ export function ConfigPanel({
           </div>
         ) : (
           <div className="space-y-6">
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <label className="text-sm font-medium text-zinc-300">Task Type</label>
-              </div>
-              <div className="flex p-1 bg-zinc-900 rounded-lg border border-zinc-800">
-                <button 
-                  onClick={() => handleTaskTypeChange("v1.5")}
-                  className={cn(
-                    "flex-1 py-1.5 text-xs font-medium rounded transition-all cursor-pointer",
-                    options.task_type === "v1.5" ? "bg-zinc-700 text-white shadow-sm" : "text-zinc-500 hover:text-zinc-300"
-                  )}
-                >
-                  v1.5
-                </button>
-                <button 
-                  onClick={() => handleTaskTypeChange("default")}
-                  className={cn(
-                    "flex-1 py-1.5 text-xs font-medium rounded transition-all cursor-pointer",
-                    options.task_type === "default" ? "bg-zinc-700 text-white shadow-sm" : "text-zinc-500 hover:text-zinc-300"
-                  )}
-                >
-                  Default
-                </button>
-                <button 
-                  onClick={() => handleTaskTypeChange("structure")}
-                  className={cn(
-                    "flex-1 py-1.5 text-xs font-medium rounded transition-all cursor-pointer",
-                    options.task_type === "structure" ? "bg-zinc-700 text-white shadow-sm" : "text-zinc-500 hover:text-zinc-300"
-                  )}
-                >
-                  Structure
-                </button>
-              </div>
-              <p className="text-xs text-zinc-500 leading-relaxed">
-                <b>v1.5:</b> Recommended for higher OCR text quality and stable extraction.<br/>
-                <b>Default:</b> JSON output with markdown-friendly extraction.<br/>
-                <b>Structure:</b> Optimized for tables and complex layouts (returns HTML).
-              </p>
-            </div>
-
-            {options.task_type === "v1.5" && (
-              <div className="space-y-3 pt-2 border-t border-zinc-800/60 animate-in fade-in slide-in-from-top-1 duration-200">
+            {options.model.toLowerCase().includes("preview") ? (
+              <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <label className="text-sm font-medium text-zinc-300">Figure Description Language</label>
-                  <span className="text-[10px] text-zinc-500 font-mono">v1.5 &lt;figure&gt;</span>
+                  <label className="text-sm font-medium text-zinc-300">Task Type (v1 Legacy)</label>
+                  <span className="text-[10px] text-amber-400 font-mono">Anchor text mode</span>
                 </div>
                 <div className="flex p-1 bg-zinc-900 rounded-lg border border-zinc-800">
-                  <button
-                    type="button"
-                    onClick={() => handleChange("figure_language", "Thai")}
+                  <button 
+                    onClick={() => handleTaskTypeChange("default")}
                     className={cn(
                       "flex-1 py-1.5 text-xs font-medium rounded transition-all cursor-pointer",
-                      (options.figure_language || "Thai") === "Thai"
-                        ? "bg-zinc-700 text-white shadow-sm"
-                        : "text-zinc-500 hover:text-zinc-300"
+                      options.task_type === "default" ? "bg-zinc-700 text-white shadow-sm" : "text-zinc-500 hover:text-zinc-300"
                     )}
                   >
-                    ภาษาไทย (Thai)
+                    Default
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => handleChange("figure_language", "English")}
+                  <button 
+                    onClick={() => handleTaskTypeChange("structure")}
                     className={cn(
                       "flex-1 py-1.5 text-xs font-medium rounded transition-all cursor-pointer",
-                      options.figure_language === "English"
-                        ? "bg-zinc-700 text-white shadow-sm"
-                        : "text-zinc-500 hover:text-zinc-300"
+                      options.task_type === "structure" ? "bg-zinc-700 text-white shadow-sm" : "text-zinc-500 hover:text-zinc-300"
                     )}
                   >
-                    English
+                    Structure
                   </button>
                 </div>
                 <p className="text-xs text-zinc-500 leading-relaxed">
-                  Language for detailed visual and chart descriptions generated inside <code className="text-violet-400 font-mono">&lt;figure&gt;</code> tags.
+                  <b>Default:</b> Extracts markdown with markdown tables.<br/>
+                  <b>Structure:</b> Enhanced layout analysis with HTML tables and image tags.
                 </p>
               </div>
+            ) : (
+              <>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm font-medium text-zinc-300">Pipeline Architecture</label>
+                    <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-violet-500/10 text-violet-400 border border-violet-500/20">v1.5 Single-Prompt</span>
+                  </div>
+                  <div className="p-3.5 rounded-xl bg-zinc-900/60 border border-zinc-800/80 text-xs text-zinc-400 leading-relaxed space-y-1.5">
+                    <p className="text-zinc-200 font-medium">Layout-aware Markdown + HTML Tables</p>
+                    <p>
+                      Typhoon OCR 1.5 operates directly from images without requiring PDF metadata or anchor text. Outputs clean Markdown, HTML tables, and visual descriptions.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-3 pt-2 border-t border-zinc-800/60 animate-in fade-in slide-in-from-top-1 duration-200">
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm font-medium text-zinc-300">Figure Description Language</label>
+                    <span className="text-[10px] text-zinc-500 font-mono">v1.5 &lt;figure&gt;</span>
+                  </div>
+                  <div className="flex p-1 bg-zinc-900 rounded-lg border border-zinc-800">
+                    <button
+                      type="button"
+                      onClick={() => handleChange("figure_language", "Thai")}
+                      className={cn(
+                        "flex-1 py-1.5 text-xs font-medium rounded transition-all cursor-pointer",
+                        (options.figure_language || "Thai") === "Thai"
+                          ? "bg-zinc-700 text-white shadow-sm"
+                          : "text-zinc-500 hover:text-zinc-300"
+                      )}
+                    >
+                      ภาษาไทย (Thai)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleChange("figure_language", "English")}
+                      className={cn(
+                        "flex-1 py-1.5 text-xs font-medium rounded transition-all cursor-pointer",
+                        options.figure_language === "English"
+                          ? "bg-zinc-700 text-white shadow-sm"
+                          : "text-zinc-500 hover:text-zinc-300"
+                      )}
+                    >
+                      English
+                    </button>
+                  </div>
+                  <p className="text-xs text-zinc-500 leading-relaxed">
+                    Language for detailed visual and chart descriptions generated inside <code className="text-violet-400 font-mono">&lt;figure&gt;</code> tags.
+                  </p>
+                </div>
+              </>
             )}
 
             <div className="space-y-3">

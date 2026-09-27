@@ -163,6 +163,20 @@ class TyphoonOCRService:
             return candidate
         return self.config.MODEL_NAME
 
+    def _resolve_model_and_task_type(self, model: Optional[str], task_type: Optional[str]) -> Tuple[str, str]:
+        """Resolve model name and ensure compatible task_type."""
+        resolved_model = self._resolve_model_name(model)
+        normalized_task = (task_type or "v1.5").strip()
+
+        # If model is explicitly a legacy preview model, enforce default or structure
+        if "typhoon-ocr-preview" in resolved_model.lower():
+            if normalized_task not in ["default", "structure"]:
+                normalized_task = "structure"
+        elif normalized_task not in ["v1.5", "default", "structure"]:
+            normalized_task = "v1.5"
+
+        return resolved_model, normalized_task
+
     @staticmethod
     def _extract_image_base64(messages: List[dict]) -> str:
         """Extract preview image (base64) from prepared OCR messages."""
@@ -173,9 +187,11 @@ class TyphoonOCRService:
             return ""
 
     @staticmethod
-    def _parse_response_text(content: Any) -> str:
+    def _parse_response_text(content: Any, task_type: str = "v1.5") -> str:
         """
         Parse model output into final text.
+        For v1.5, Typhoon OCR outputs clean Markdown directly (preserving <table> and <figure>).
+        For legacy v1 models, natural_text is extracted from JSON or code fences.
         """
         if content is None:
             return ""
@@ -183,6 +199,10 @@ class TyphoonOCRService:
         raw_content = str(content).strip()
         if not raw_content:
             return ""
+
+        # For v1.5, return clean markdown directly without stripping figure tags
+        if task_type == "v1.5":
+            return raw_content
 
         def _extract_from_json(candidate: str) -> Optional[str]:
             try:
@@ -206,13 +226,13 @@ class TyphoonOCRService:
         if parsed_text is None:
             parsed_text = raw_content
 
-        return parsed_text.replace("<figure>", "").replace("</figure>", "").strip()
+        return parsed_text.strip()
 
     async def process_single_page(
         self,
         file_path: str,
         page_num: int,
-        task_type: str = "default",
+        task_type: str = "v1.5",
         model: Optional[str] = None,
         max_tokens: Optional[int] = None,
         temperature: Optional[float] = None,
@@ -223,6 +243,7 @@ class TyphoonOCRService:
         """
         Process a single page asynchronously and return page result with token usage.
         """
+        resolved_model, task_type = self._resolve_model_and_task_type(model, task_type)
         _max_tokens = max_tokens or self.config.MAX_TOKENS
         _temperature = temperature if temperature is not None else self.config.TEMPERATURE
         _top_p = top_p if top_p is not None else self.config.TOP_P
@@ -232,7 +253,6 @@ class TyphoonOCRService:
             _repetition_penalty = 1.1
         else:
             _repetition_penalty = self.config.REPETITION_PENALTY
-        resolved_model = self._resolve_model_name(model)
 
         try:
             # File reading and image processing is CPU bound, offload to thread pool
@@ -265,7 +285,7 @@ class TyphoonOCRService:
                 token_count = int(response.usage.total_tokens)
 
             content = response.choices[0].message.content
-            text = self._parse_response_text(content)
+            text = self._parse_response_text(content, task_type=task_type)
 
             return (
                 OcrPageResult(
@@ -290,7 +310,7 @@ class TyphoonOCRService:
     async def process_document(
         self,
         file_path: str,
-        task_type: str = "default",
+        task_type: str = "v1.5",
         model: Optional[str] = None,
         pages: Optional[List[int]] = None,
         max_tokens: Optional[int] = None,

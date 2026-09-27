@@ -2,7 +2,8 @@ import dynamic from "next/dynamic";
 import { useState, useEffect, useRef, memo } from "react";
 import ReactMarkdown from "react-markdown";
 import rehypeHighlight from "rehype-highlight";
-import { Copy, Check, Eye, Clock, Zap, Columns, LayoutList, ChevronLeft, ChevronRight, ChevronDown, Download, FileText } from "lucide-react";
+import rehypeRaw from "rehype-raw";
+import { Copy, Check, Eye, Clock, Zap, Columns, LayoutList, ChevronLeft, ChevronRight, ChevronDown, Download, FileText, Image as ImageIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { OcrOptions, FileSlot } from "@/types/ocr";
 import { markdownToPlainText } from "@/utils/markdownText";
@@ -19,7 +20,40 @@ import "highlight.js/styles/github-dark.css";
 const MarkdownContent = memo(function MarkdownContent({ text }: { text: string }) {
   return (
     <div className="markdown-output prose prose-invert max-w-none text-zinc-300">
-      <ReactMarkdown rehypePlugins={[rehypeHighlight]}>
+      <ReactMarkdown
+        rehypePlugins={[rehypeRaw, rehypeHighlight]}
+        components={{
+          table: ({ children }) => (
+            <div className="my-4 w-full overflow-x-auto rounded-xl border border-zinc-800 bg-zinc-950/70 shadow-sm">
+              <table className="w-full text-left text-sm border-collapse">{children}</table>
+            </div>
+          ),
+          thead: ({ children }) => (
+            <thead className="bg-zinc-900/90 text-xs font-semibold text-zinc-300 uppercase tracking-wider border-b border-zinc-800">
+              {children}
+            </thead>
+          ),
+          th: ({ children }) => (
+            <th className="px-4 py-3 font-medium border-r border-zinc-800/60 last:border-r-0">
+              {children}
+            </th>
+          ),
+          td: ({ children }) => (
+            <td className="px-4 py-2.5 text-zinc-300 border-t border-zinc-800/60 border-r border-zinc-800/60 last:border-r-0 hover:bg-zinc-900/30 transition-colors">
+              {children}
+            </td>
+          ),
+          figure: ({ children }) => (
+            <figure className="my-4 p-4 rounded-xl border border-violet-500/30 bg-violet-950/15 text-zinc-200">
+              <div className="flex items-center gap-2 mb-2 text-xs font-semibold text-violet-400 uppercase tracking-wider">
+                <ImageIcon size={14} className="text-violet-400" />
+                <span>Figure Analysis</span>
+              </div>
+              <div className="text-sm leading-relaxed text-zinc-300 italic not-italic-children">{children}</div>
+            </figure>
+          ),
+        }}
+      >
         {text}
       </ReactMarkdown>
     </div>
