@@ -47,6 +47,7 @@
       <a href="#about-the-project">About The Project</a>
       <ul>
         <li><a href="#built-with">Built With</a></li>
+        <li><a href="#system-architecture">System Architecture</a></li>
       </ul>
     </li>
     <li>
@@ -77,18 +78,19 @@ Typhoon OCR is an advanced vision-language model for extracting structured markd
 
 This fork provides a modern **Next.js web application** alongside the original Gradio demo, featuring:
 
-- 🚀 **Modern UI** with dark theme and premium aesthetics
+- 🎛️ **Precision Studio Dark UI**: Enterprise Obsidian theme (`#09090b`), tactile surfaces, 1px subtle borders, disciplined Typhoon Violet accent (`#8b5cf6`), and zero emoji noise in UI chrome ([ADR 0003](docs/adr/0003-unified-studio-workspace-and-design-system.md), [DESIGN.md](DESIGN.md))
+- 📑 **Unified Sidebar**: Document ingestion and inference parameter controls consolidated into a single vertical scrollable sidebar—eliminating context-switching tabs
+- 🪟 **Resizable Compare Workbench**: Interactive draggable split divider (22%–78%), Fit vs 100% natural resolution zoom controls, and quick page hopping filmstrip pills (`P.1`, `P.2`...)
+- 🚀 **Hardened CLI Launcher (`start_app.bat`)**: 4-phase diagnostic startup, port 8345 & 3000 conflict detection, safe ping delay, hoisted dependency cache check, and exit pause
 - 🤖 **Typhoon OCR 1.5 Architecture**: Official support for `typhoon-ocr` (2B) unified single-prompt model, alongside legacy `typhoon-ocr-preview` (7B) anchor-text pipeline
 - 📐 **LaTeX & Visual Diagram Analysis**: Extracts mathematical formulas and figures with configurable explanation language (`figure_language`: Thai / English)
 - 📊 **Rich Markdown & HTML Rendering**: Embedded `<table>`, `<figure>`, and `<page_number>` tags rendered natively with responsive styling
 - 📄 **Multi-page PDF support** with interactive page selection and viewport-based lazy loading
-- 🔗 **SSRF-Protected URL Import**: Secure document loading from remote URLs with DNS and CIDR filtering
-- 📈 **Real-time SSE progress** indicators during OCR processing
+- 🔗 **SSRF-Protected URL Import**: Secure document loading from remote URLs with DNS and CIDR filtering ([ADR 0002](docs/adr/0002-ssrf-mitigation-in-proxy.md))
+- 📈 **Real-time SSE progress** indicators and elapsed latency timer during OCR processing
 - 🤖 **Smart Resume & Retry**: Automatically filter successful files and retry only rate-limited or failed files (e.g., HTTP 429) without losing queue progress
 - ⚙️ **Dynamic Model Discovery & Limits**: Dynamically discover models (`/api/models`) and adjust `MAX_FILES` directly via the in-app Settings panel
-- 🎨 **Compare mode** to view original and extracted text side-by-side
 - 🔄 **In-App Auto-Update**: Safe one-click GitHub update (`git pull`) with sanitized parameter checking
-- 🎨 **Design System**: Structured visual standards (`PRODUCT.md`) based on `impeccable` and `ui-ux-pro-max` guidelines
 
 > **This fork focuses on Windows 10/11.** For macOS/Linux setup, please refer to the official Typhoon OCR repository.
 >
@@ -103,6 +105,49 @@ This fork provides a modern **Next.js web application** alongside the original G
 - [![TailwindCSS][TailwindCSS]][TailwindCSS-url]
 - [![FastAPI][FastAPI]][FastAPI-url]
 - [![Python][Python]][Python-url]
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+### System Architecture
+
+The following diagram illustrates the end-to-end processing pipeline, from document ingestion in the Next.js Studio to async inference with Typhoon OCR:
+
+```mermaid
+flowchart TD
+    subgraph Client["Client — Next.js Web Studio (:3000)"]
+        UI["Precision Studio Dark UI"]
+        Sidebar["Unified Sidebar<br/>(Dynamic Dropzone & Parameters)"]
+        Workbench["Resizable Compare Workbench<br/>(Draggable Split & Page Filmstrip)"]
+        UI --> Sidebar
+        UI --> Workbench
+    end
+
+    subgraph Backend["Backend — FastAPI Service (:8345)"]
+        Router["/api/ocr Endpoint & SSE Stream"]
+        Poppler["Poppler PDF Rasterizer<br/>(Windows Auto-Fallback)"]
+        RetryEngine["Resilient HTTP Client<br/>(Exponential Backoff & Retries)"]
+        Router --> Poppler
+        Poppler --> RetryEngine
+    end
+
+    subgraph Engine["Typhoon Vision-Language API"]
+        Model15["Typhoon OCR 1.5 (2B)<br/>Single-Prompt + Figure Analysis"]
+        Model10["Typhoon OCR v1 (7B)<br/>Legacy Anchor-Text Pipeline"]
+    end
+
+    subgraph Output["Structured Output Artifacts"]
+        MD["Clean Markdown"]
+        Tables["HTML &lt;table&gt;"]
+        Figures["Visual &lt;figure&gt; Analysis"]
+        LaTeX["LaTeX Formulas ($$...$$)"]
+    end
+
+    Sidebar -->|"Multipart Form / SSE Stream"| Router
+    RetryEngine -->|"API Inference"| Model15
+    RetryEngine -.->|"Legacy Fallback"| Model10
+    Model15 --> Output
+    Output -->|"Real-time SSE / Markdown Stream"| Workbench
+```
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -217,6 +262,10 @@ pdftoppm -v
 
 ## Features
 
+- 🎛️ **Precision Studio Dark UI**: Enterprise Obsidian theme (`#09090b`), tactile 1px subtle borders, zero emoji UI chrome, and monospace tabular numbers for telemetry
+- 📑 **Unified Sidebar**: Single scrollable sidebar consolidating document queue, dynamic compact dropzone, and inference parameters
+- 🪟 **Resizable Compare Workbench**: Interactive draggable split divider (22%–78%), Fit vs 100% natural resolution zoom controls, and quick page hopping filmstrip pills (`P.1`, `P.2`...)
+- 🚀 **Hardened CLI Launcher (`start_app.bat`)**: 4-phase diagnostic startup, port 8345 & 3000 conflict checks, safe ping delay, hoisted dependency cache check, and exit pause
 - ✅ Upload PDF or images (PNG, JPG, WebP)
 - 🚀 **Typhoon OCR 1.5 Integration**: Unified single-prompt extraction for Markdown, LaTeX equations, and HTML tables
 - 🖼️ **Figure Visual Analysis**: Configurable figure description language (`th` / `en`) for diagram and illustration breakdowns
@@ -231,9 +280,9 @@ pdftoppm -v
 - ⚡ **Lightning Fast Asynchronous Backend** processing pages concurrently via `asyncio`
 - ⚡ **Progressive Page Rendering**: Render multi-page markdown outputs smoothly without freezing the UI
 - 📊 **Native Table & Figure Rendering**: Embedded HTML `<table>` and `<figure>` tags rendered cleanly via `rehype-raw`
-- ✅ Real-time progress indicator per file with live status badges
+- ✅ Real-time progress indicator per file with live status badges and elapsed latency timer
 - ✅ Tabbed results navigation with "+X more" overflow dropdown
-- ✅ Compare mode: Original image vs. extracted text
+- ✅ Compare mode: Original image vs. extracted text with resizable divider
 - 📦 **Flexible Export Options**: Copy text/markdown (per-file or merged) & Download `.md` or `.zip` archives (with filename deduplication)
 - ✅ Code generator for API integration (Python, cURL, JavaScript)
 
@@ -254,6 +303,9 @@ pdftoppm -v
 - [x] **Typhoon OCR 1.5 Architecture Alignment (Single-prompt, LaTeX, Figure analysis, HTML tables)**
 - [x] **Dynamic model discovery and contextual configuration**
 - [x] **API retry resilience & Windows Poppler auto-fallback**
+- [x] **Precision Studio Dark UI & Resizable Compare Workbench ([ADR 0003](docs/adr/0003-unified-studio-workspace-and-design-system.md))**
+- [x] **Unified Sidebar Workspace with dynamic compact dropzone**
+- [x] **Hardened Windows CLI launcher (`start_app.bat`) with port conflict detection**
 - [ ] Support for more document types
 
 See the [open issues](https://github.com/naravid19/typhoon-ocr/issues) for a full list of proposed features (and known issues).
