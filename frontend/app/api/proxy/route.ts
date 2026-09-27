@@ -19,6 +19,10 @@ function isPrivateIp(ip: string): boolean {
     if (parts[0] === 169 && parts[1] === 254) return true;
     // 0.0.0.0/8
     if (parts[0] === 0) return true;
+    // 224.0.0.0/4 (multicast)
+    if (parts[0] >= 224 && parts[0] <= 239) return true;
+    // 240.0.0.0/4 (reserved / broadcast)
+    if (parts[0] >= 240) return true;
     return false;
   }
 
@@ -27,6 +31,7 @@ function isPrivateIp(ip: string): boolean {
     if (lower === '::1' || lower === '0:0:0:0:0:0:0:1') return true;
     if (lower.startsWith('fc') || lower.startsWith('fd')) return true;
     if (lower.startsWith('fe80')) return true;
+    if (lower.startsWith('ff')) return true; // IPv6 multicast
     if (lower.startsWith('::ffff:')) {
       const ipv4Part = ip.substring(7);
       return isPrivateIp(ipv4Part);
@@ -75,7 +80,7 @@ export async function POST(request: Request) {
     ) {
       return NextResponse.json(
         { error: 'Access to private or local network addresses is prohibited' },
-        { status: 403 }
+        { status: 400 }
       );
     }
 
@@ -86,7 +91,7 @@ export async function POST(request: Request) {
         if (isPrivateIp(entry.address)) {
           return NextResponse.json(
             { error: 'Access to private or local network addresses is prohibited' },
-            { status: 403 }
+            { status: 400 }
           );
         }
       }

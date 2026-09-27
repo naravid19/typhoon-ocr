@@ -96,6 +96,7 @@ export async function processOcrWithProgress(
 export function generateCode(language: string, file: File | null, options: OcrOptions): string {
   const filename = file?.name || "document.pdf";
   const { model, task_type, max_tokens, temperature, top_p, repetition_penalty, pages, figure_language } = options;
+  const includeFigureLang = task_type === "v1.5" && Boolean(figure_language);
 
   if (language === "python") {
     return `import requests
@@ -108,7 +109,7 @@ data = {
     "max_tokens": ${max_tokens},
     "temperature": ${temperature},
     "top_p": ${top_p},
-    "repetition_penalty": ${repetition_penalty}${figure_language ? `,
+    "repetition_penalty": ${repetition_penalty}${includeFigureLang ? `,
     "figure_language": "${figure_language}"` : ""}${pages ? `,
     "pages": "${pages}"` : ""}
 }
@@ -125,7 +126,7 @@ print(response.json())`;
   -F "max_tokens=${max_tokens}" \\
   -F "temperature=${temperature}" \\
   -F "top_p=${top_p}" \\
-  -F "repetition_penalty=${repetition_penalty}"${figure_language ? ` \\
+  -F "repetition_penalty=${repetition_penalty}"${includeFigureLang ? ` \\
   -F "figure_language=${figure_language}"` : ""}${pages ? ` \\
   -F "pages=${pages}"` : ""}`;
   }
@@ -138,7 +139,7 @@ formData.append("task_type", "${task_type}");
 formData.append("max_tokens", "${max_tokens}");
 formData.append("temperature", "${temperature}");
 formData.append("top_p", "${top_p}");
-formData.append("repetition_penalty", "${repetition_penalty}");${figure_language ? `
+formData.append("repetition_penalty", "${repetition_penalty}");${includeFigureLang ? `
 formData.append("figure_language", "${figure_language}");` : ""}${pages ? `
 formData.append("pages", "${pages}");` : ""}
 

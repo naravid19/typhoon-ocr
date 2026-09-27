@@ -172,7 +172,8 @@ class TyphoonOCRService:
         if "typhoon-ocr-preview" in resolved_model.lower():
             if normalized_task not in ["default", "structure"]:
                 normalized_task = "structure"
-        elif normalized_task not in ["v1.5", "default", "structure"]:
+        elif "typhoon-ocr" in resolved_model.lower() or normalized_task not in ["default", "structure"]:
+            # Typhoon OCR 1.5 is a single-prompt model; force v1.5 to prevent legacy anchor text prompting
             normalized_task = "v1.5"
 
         return resolved_model, normalized_task

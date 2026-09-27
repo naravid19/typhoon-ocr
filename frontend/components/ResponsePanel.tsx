@@ -49,7 +49,7 @@ const MarkdownContent = memo(function MarkdownContent({ text }: { text: string }
                 <ImageIcon size={14} className="text-violet-400" />
                 <span>Figure Analysis</span>
               </div>
-              <div className="text-sm leading-relaxed text-zinc-300 italic not-italic-children">{children}</div>
+              <div className="text-sm leading-relaxed text-zinc-300 italic [&>*]:not-italic">{children}</div>
             </figure>
           ),
         }}
