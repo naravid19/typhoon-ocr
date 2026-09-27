@@ -110,9 +110,9 @@ raw_web/
 # *.jpeg
 # !images/screenshot.png
 /backend/tests
-/docs
 /todos
 AGENTS.md
 /resource
-CONTEXT.md
+/docs
 DESIGN.md
+CONTEXT.md
