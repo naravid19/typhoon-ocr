@@ -1,45 +1,38 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { RefreshCw, Download, CheckCircle2, AlertCircle, Sparkles, X } from "lucide-react";
+import { RefreshCw, Download, CheckCircle2, AlertCircle, Sparkles, X, ExternalLink, Info } from "lucide-react";
 
 interface UpdateInfo {
   hasUpdate: boolean;
-  localSHA?: string;
-  remoteSHA?: string;
-  commitMessage?: string;
-  branch?: string;
-  error?: string;
+  current: string;
+  latest: { tag: string; title: string; notes: string; url: string } | null;
+  canSelfUpdate: boolean;
+  blocker: { code: "not-git" | "wrong-branch" | "dirty"; error: string } | null;
 }
 
 export function UpdateBadge() {
   const [info, setInfo] = useState<UpdateInfo | null>(null);
-  const [status, setStatus] = useState<"idle" | "checking" | "available" | "updating" | "success" | "error">("idle");
+  const [status, setStatus] = useState<"idle" | "available" | "updating" | "success" | "error">("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [dependenciesChanged, setDependenciesChanged] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
-  const [logs, setLogs] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const checkUpdates = async () => {
-    setStatus("checking");
-    try {
-      const res = await fetch("/api/update/check");
-      if (!res.ok) throw new Error("Failed to check update");
-      const data: UpdateInfo = await res.json();
-      setInfo(data);
-      if (data.hasUpdate) {
-        setStatus("available");
-      } else {
-        setStatus("idle");
-      }
-    } catch (err) {
-      console.warn("Update check failed:", err);
-      setStatus("idle");
-    }
-  };
-
+  // One check per page load; the server caches the GitHub answer, so this is cheap
   useEffect(() => {
-    checkUpdates();
+    let cancelled = false;
+    fetch("/api/update/check")
+      .then((res) => (res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`))))
+      .then((data: UpdateInfo) => {
+        if (cancelled) return;
+        setInfo(data);
+        if (data.hasUpdate) setStatus("available");
+      })
+      .catch((err) => console.warn("Update check failed:", err));
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // Handle outside click and Escape key for dropdown popover
@@ -66,16 +59,23 @@ export function UpdateBadge() {
     };
   }, [isOpen]);
 
-  const handlePull = async () => {
+  const latest = info?.latest ?? null;
+
+  const handleUpdate = async () => {
+    if (!latest) return;
     setStatus("updating");
     setErrorMessage(null);
     try {
-      const res = await fetch("/api/update/pull", { method: "POST" });
+      const res = await fetch("/api/update/pull", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tag: latest.tag }),
+      });
       const data = await res.json();
       if (!res.ok || !data.success) {
-        throw new Error(data.error || "Git pull failed");
+        throw new Error(data.error || "Update failed");
       }
-      setLogs(data.output);
+      setDependenciesChanged(Boolean(data.dependenciesChanged));
       setStatus("success");
     } catch (err) {
       setErrorMessage(err instanceof Error ? err.message : "Update failed");
@@ -83,33 +83,55 @@ export function UpdateBadge() {
     }
   };
 
-  if (status === "idle" && !info?.hasUpdate) {
+  if (!info?.hasUpdate || !latest) {
     return null;
   }
+
+  const releaseLink = (
+    <a
+      href={latest.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="inline-flex items-center gap-1 text-[11px] text-violet-300 hover:text-violet-200 transition-colors"
+    >
+      <span>View release on GitHub</span>
+      <ExternalLink size={11} />
+    </a>
+  );
 
   return (
     <div className="relative inline-block" ref={containerRef}>
       {/* Badge Button */}
-      {status === "available" && (
+      {status !== "success" && (
         <button
           onClick={() => setIsOpen(!isOpen)}
           aria-expanded={isOpen}
-          aria-label="Software update available"
+          aria-label={`Software update available: ${latest.tag}`}
           className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-full bg-violet-500/10 border border-violet-500/30 text-violet-300 hover:bg-violet-500/20 transition-all cursor-pointer"
-          title="New update available from GitHub"
+          title={`${latest.tag} is available on GitHub`}
         >
           <Sparkles size={12} className="text-violet-400" />
           <span>Update Available</span>
-          <span className="w-1.5 h-1.5 rounded-full bg-violet-400" />
+          <span className="font-mono text-[10px] text-violet-200/90">{latest.tag}</span>
+        </button>
+      )}
+      {status === "success" && (
+        <button
+          onClick={() => setIsOpen(!isOpen)}
+          aria-expanded={isOpen}
+          className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 cursor-pointer"
+        >
+          <CheckCircle2 size={12} />
+          <span>Updated to {latest.tag}: restart</span>
         </button>
       )}
 
       {/* Modal / Popover Dropdown */}
       {isOpen && (
-        <div 
+        <div
           role="dialog"
           aria-label="Software update options"
-          className="absolute right-0 mt-2 w-80 p-4 rounded-xl border border-white/[0.08] bg-[#121215] shadow-2xl z-50 text-xs animate-in fade-in zoom-in-95 duration-150"
+          className="absolute right-0 mt-2 w-[22rem] max-w-[calc(100vw-2rem)] p-4 rounded-xl border border-white/[0.08] bg-[#121215] shadow-2xl z-50 text-xs animate-in fade-in zoom-in-95 duration-150"
         >
           <div className="flex items-center justify-between pb-3 border-b border-white/[0.08] mb-3">
             <div className="flex items-center gap-2 font-semibold text-zinc-100">
@@ -118,41 +140,70 @@ export function UpdateBadge() {
             </div>
             <button
               onClick={() => setIsOpen(false)}
-              aria-label="Close modal"
+              aria-label="Close"
               className="text-zinc-500 hover:text-zinc-300 transition-colors cursor-pointer p-1 rounded-md hover:bg-zinc-800"
             >
               <X size={14} />
             </button>
           </div>
 
-          {status === "available" && info && (
+          {status === "available" && (
             <div className="space-y-3">
-              <div className="bg-zinc-900/60 p-2.5 rounded-lg border border-zinc-800/60 space-y-1">
-                <div className="flex justify-between text-zinc-400 text-[11px] font-mono">
-                  <span>Local: <code className="text-zinc-200">{info.localSHA}</code></span>
-                  <span>Latest: <code className="text-violet-400">{info.remoteSHA}</code></span>
+              <div className="bg-zinc-900/60 p-2.5 rounded-lg border border-zinc-800/60 space-y-2">
+                <div className="flex items-center justify-between text-[11px] font-mono text-zinc-400">
+                  <span>
+                    Installed <code className="text-zinc-200">v{info.current}</code>
+                  </span>
+                  <span>
+                    Latest <code className="text-violet-400">{latest.tag}</code>
+                  </span>
                 </div>
-                {info.commitMessage && (
-                  <p className="text-zinc-300 font-mono text-[11px] truncate pt-1 border-t border-zinc-800/40" title={info.commitMessage}>
-                    "{info.commitMessage}"
-                  </p>
+                {latest.title && latest.title !== latest.tag && (
+                  <p className="text-zinc-200 font-medium pt-1 border-t border-zinc-800/40">{latest.title}</p>
+                )}
+                {latest.notes && (
+                  <div className="max-h-40 overflow-y-auto whitespace-pre-line text-[11px] leading-relaxed text-zinc-400 scrollbar-thin">
+                    {latest.notes}
+                  </div>
                 )}
               </div>
 
-              <button
-                onClick={handlePull}
-                className="w-full btn-primary py-2 px-3 text-xs font-medium flex items-center justify-center gap-2"
-              >
-                <Download size={13} />
-                <span>Pull & Update Now</span>
-              </button>
+              {releaseLink}
+
+              {info.blocker && (
+                <p className="flex items-start gap-1.5 text-[11px] leading-relaxed text-amber-200/90 bg-amber-950/20 border border-amber-800/40 p-2 rounded">
+                  <Info size={13} className="mt-0.5 shrink-0" />
+                  <span>{info.blocker.error}</span>
+                </p>
+              )}
+
+              {info.canSelfUpdate && (
+                <button
+                  onClick={handleUpdate}
+                  className="w-full btn-primary py-2 px-3 text-xs font-medium flex items-center justify-center gap-2"
+                >
+                  <Download size={13} />
+                  <span>Update to {latest.tag}</span>
+                </button>
+              )}
+              {info.blocker?.code === "not-git" && (
+                <a
+                  href={latest.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full btn-primary py-2 px-3 text-xs font-medium flex items-center justify-center gap-2"
+                >
+                  <Download size={13} />
+                  <span>Download {latest.tag}</span>
+                </a>
+              )}
             </div>
           )}
 
           {status === "updating" && (
-            <div className="py-4 flex flex-col items-center justify-center gap-2 text-zinc-300">
+            <div className="py-4 flex flex-col items-center justify-center gap-2 text-zinc-300" role="status">
               <RefreshCw size={20} className="animate-spin text-violet-400" />
-              <span>Running `git pull origin ${info?.branch || 'main'}`...</span>
+              <span>Updating to {latest.tag}...</span>
             </div>
           )}
 
@@ -160,16 +211,13 @@ export function UpdateBadge() {
             <div className="space-y-3">
               <div className="flex items-center gap-2 text-emerald-400 font-medium">
                 <CheckCircle2 size={16} />
-                <span>Update Completed!</span>
+                <span>Updated to {latest.tag}</span>
               </div>
-              <p className="text-zinc-400 text-[11px]">
-                Latest changes pulled successfully. If dependencies were modified, restart your dev server.
+              <p className="text-zinc-400 text-[11px] leading-relaxed">
+                Restart the app to run the new version.
+                {dependenciesChanged &&
+                  " Dependencies changed in this release: run start_app.bat again (or npm install and pip install -r requirements.txt) before restarting."}
               </p>
-              {logs && (
-                <pre className="bg-zinc-900 p-2 rounded text-[10px] text-zinc-400 font-mono overflow-x-auto max-h-24">
-                  {logs}
-                </pre>
-              )}
               <button
                 onClick={() => setIsOpen(false)}
                 className="w-full py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-medium rounded-lg transition-colors cursor-pointer"
@@ -183,17 +231,20 @@ export function UpdateBadge() {
             <div className="space-y-3">
               <div className="flex items-center gap-2 text-rose-400 font-medium">
                 <AlertCircle size={16} />
-                <span>Update Failed</span>
+                <span>Update failed</span>
               </div>
-              <p className="text-rose-300/90 text-[11px] bg-rose-950/30 border border-rose-800/40 p-2 rounded">
+              <p className="text-rose-300/90 text-[11px] leading-relaxed bg-rose-950/30 border border-rose-800/40 p-2 rounded">
                 {errorMessage}
               </p>
-              <button
-                onClick={handlePull}
-                className="w-full py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-medium rounded-lg transition-colors cursor-pointer"
-              >
-                Retry
-              </button>
+              <div className="flex items-center justify-between">
+                {releaseLink}
+                <button
+                  onClick={handleUpdate}
+                  className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-medium rounded-lg transition-colors cursor-pointer"
+                >
+                  Try again
+                </button>
+              </div>
             </div>
           )}
         </div>

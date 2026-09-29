@@ -17,6 +17,11 @@ export function Navbar() {
             <span className="text-[10px] text-violet-400/90 font-mono uppercase tracking-wider px-1.5 py-0.5 rounded bg-violet-500/10 border border-violet-500/20">
               Studio
             </span>
+            {process.env.NEXT_PUBLIC_APP_VERSION && (
+              <span className="text-[10px] text-zinc-500 font-mono tabular-nums" title="Installed version">
+                v{process.env.NEXT_PUBLIC_APP_VERSION}
+              </span>
+            )}
           </div>
         </Link>
       </div>

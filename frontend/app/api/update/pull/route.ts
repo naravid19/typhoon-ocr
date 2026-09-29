@@ -1,54 +1,41 @@
 import { NextResponse } from 'next/server';
-import { exec } from 'child_process';
-import { promisify } from 'util';
+import { applyUpdate, gitRunner, releaseChecker } from '@/lib/updates';
 
-const execAsync = promisify(exec);
+// Fast-forwards this copy to the latest published release (never to unreleased commits on the branch).
+export async function POST(request: Request) {
+  // Local, state-changing endpoint: refuse requests that another website's page fired at us
+  const origin = request.headers.get('origin');
+  if (origin && new URL(origin).host !== request.headers.get('host')) {
+    return NextResponse.json({ success: false, error: 'Cross-origin request refused.' }, { status: 403 });
+  }
 
-export async function POST() {
+  const { tag } = await request.json().catch(() => ({ tag: undefined }));
+  const latest = await releaseChecker.latest();
+  if (typeof tag !== 'string' || !latest || latest.tag !== tag) {
+    return NextResponse.json(
+      { success: false, error: 'That is no longer the latest release. Check for updates again.' },
+      { status: 409 }
+    );
+  }
+
   try {
-    // 1. Check local branch
-    const { stdout: localBranchOutput } = await execAsync('git rev-parse --abbrev-ref HEAD');
-    const branch = localBranchOutput.trim() || 'main';
-
-    // Security: Validate branch name to prevent shell command injection
-    if (!/^[a-zA-Z0-9_\-\.\/]+$/.test(branch)) {
+    const result = await applyUpdate(tag, gitRunner(process.cwd()));
+    if (!result.success) {
       return NextResponse.json(
-        {
-          success: false,
-          error: `Invalid branch name: ${branch}`,
-        },
-        { status: 400 }
+        { success: false, code: result.code, error: result.error },
+        { status: result.code === 'invalid-tag' ? 400 : 409 }
       );
     }
-
-    // 2. Check git status to ensure working directory is clean
-    const { stdout: statusOutput } = await execAsync('git status --porcelain');
-    if (statusOutput.trim().length > 0) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'Local uncommitted changes detected. Please stash or commit your changes before updating.',
-          details: statusOutput.trim(),
-        },
-        { status: 400 }
-      );
-    }
-
-    // 3. Execute git pull safely
-    const { stdout: pullOutput, stderr: pullStderr } = await execAsync(`git pull origin "${branch}"`);
-
     return NextResponse.json({
       success: true,
-      message: 'Successfully pulled latest changes from origin.',
-      output: pullOutput || pullStderr,
+      from: result.from.substring(0, 7),
+      to: result.to.substring(0, 7),
+      dependenciesChanged: result.dependenciesChanged,
     });
   } catch (error) {
-    console.error('[Update Pull Error]:', error);
+    console.error('[Update Error]:', error);
     return NextResponse.json(
-      {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to execute git pull',
-      },
+      { success: false, error: error instanceof Error ? error.message : 'Update failed' },
       { status: 500 }
     );
   }
