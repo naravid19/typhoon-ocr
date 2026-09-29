@@ -9,10 +9,13 @@ Handles document processing, API calls, and result formatting using asynchronous
 import asyncio
 import base64
 import json
+import logging
 import os
+import random
 import re
 import subprocess
 import time
+from collections import deque
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, List, Optional, Tuple
@@ -26,6 +29,8 @@ from typhoon_ocr import prepare_ocr_messages
 
 load_dotenv()
 
+logger = logging.getLogger("typhoon.ocr")
+
 
 @dataclass
 class Config:
@@ -37,7 +42,13 @@ class Config:
     REPETITION_PENALTY: float = 1.2
     TEMPERATURE: float = 0.1
     TOP_P: float = 0.6
+    # Docs (docs.opentyphoon.ai/en/rate-limits): typhoon-ocr = 2 req/s, 20 req/min. 0 = unlimited (self-hosted).
+    RATE_LIMIT_RPS: float = field(default_factory=lambda: float(os.getenv(
+        "TYPHOON_RATE_LIMIT_RPS", "2" if "opentyphoon.ai" in os.getenv("TYPHOON_BASE_URL", "https://api.opentyphoon.ai/v1") else "0")))
+    RATE_LIMIT_RPM: int = field(default_factory=lambda: int(os.getenv(
+        "TYPHOON_RATE_LIMIT_RPM", "20" if "opentyphoon.ai" in os.getenv("TYPHOON_BASE_URL", "https://api.opentyphoon.ai/v1") else "0")))
     MAX_RETRIES: int = 5
+    MAX_TIMEOUT_RETRIES: int = 2  # attempts allowed to time out (408 / client timeout) before failing the page
     IMAGE_DIM: int = 1800
     TEXT_LENGTH: int = 8000
 
@@ -123,8 +134,32 @@ class TyphoonOCRService:
             base_url=self.config.BASE_URL,
             api_key=self.config.API_KEY,
             timeout=300.0,
-            max_retries=2
+            max_retries=0  # retries handled in _call_api_with_retry; SDK retries multiplied the storm
         )
+        # One gate for ALL requests/files: per-request semaphores stacked (5 pages x 3 files = 15 upstream calls)
+        self._api_gate = asyncio.Semaphore(int(os.getenv("TYPHOON_MAX_CONCURRENCY", "3")))
+        self._rate_lock = asyncio.Lock()  # FIFO queue for request starts
+        self._request_starts: deque = deque()  # monotonic start times within the last 60s
+
+    async def _wait_for_rate_slot(self) -> None:
+        """Block until one more request start fits the RPS and RPM limits (shared by every file)."""
+        window = 61  # 60s + 1s margin: server counts arrival time, we count send time
+        rps, rpm = self.config.RATE_LIMIT_RPS, self.config.RATE_LIMIT_RPM
+        async with self._rate_lock:
+            while True:
+                now = time.monotonic()
+                while self._request_starts and now - self._request_starts[0] >= window:
+                    self._request_starts.popleft()
+                wait = 0.0
+                if rpm and len(self._request_starts) >= rpm:
+                    wait = window - (now - self._request_starts[0])
+                if rps and self._request_starts:
+                    wait = max(wait, 1 / rps - (now - self._request_starts[-1]))
+                if wait <= 0:
+                    self._request_starts.append(now)
+                    return
+                logger.debug("rate limiter: waiting %.1fs", wait)
+                await asyncio.sleep(wait)
 
     def get_page_count(self, file_path: str) -> int:
         """Safely retrieves page count for PDFs; returns 1 for images."""
@@ -135,26 +170,53 @@ class TyphoonOCRService:
             pass
         return 1
 
-    async def _call_api_with_retry(self, func: Callable, *args, **kwargs) -> Any:
+    async def _call_api_with_retry(self, func: Callable, *args, log_ctx: str = "", **kwargs) -> Any:
         """
         Executes an async function with exponential backoff retry logic.
         """
+        timeouts = 0  # 408/timeout = page stuck upstream; the same input stalls again, so don't retry 5x
         for attempt in range(self.config.MAX_RETRIES):
-            try:
-                return await func(*args, **kwargs)
-            except (APIConnectionError, APITimeoutError) as e:
-                if attempt == self.config.MAX_RETRIES - 1:
-                    raise e
-                await asyncio.sleep(2 ** attempt)
-            except APIStatusError as e:
-                if e.status_code in [408, 429, 500, 502, 503, 504]:
-                    if attempt == self.config.MAX_RETRIES - 1:
+            waited_since = time.monotonic()
+            # Sleep while holding the gate so a 429 backs off every in-flight page, not just this one
+            async with self._api_gate:
+                started = time.monotonic()
+                logger.debug("%s waited %.1fs for API gate", log_ctx, started - waited_since)
+                logger.info("%s API call attempt %d/%d", log_ctx, attempt + 1, self.config.MAX_RETRIES)
+                try:
+                    await self._wait_for_rate_slot()
+                    started = time.monotonic()  # exclude time spent queued for the rate limit
+                    response = await func(*args, **kwargs)
+                    logger.info("%s API ok in %.1fs", log_ctx, time.monotonic() - started)
+                    return response
+                except (APIConnectionError, APITimeoutError) as e:
+                    logger.warning("%s API %s after %.1fs (attempt %d/%d)", log_ctx, type(e).__name__,
+                                   time.monotonic() - started, attempt + 1, self.config.MAX_RETRIES)
+                    if isinstance(e, APITimeoutError):
+                        timeouts += 1
+                    if attempt == self.config.MAX_RETRIES - 1 or timeouts >= self.config.MAX_TIMEOUT_RETRIES:
                         raise e
                     await asyncio.sleep(2 ** attempt)
-                else:
+                except APIStatusError as e:
+                    if e.status_code in [408, 429, 500, 502, 503, 504]:
+                        if e.status_code == 408:
+                            timeouts += 1
+                        if attempt == self.config.MAX_RETRIES - 1 or timeouts >= self.config.MAX_TIMEOUT_RETRIES:
+                            logger.error("%s API HTTP %s, giving up (attempt %d, timeouts %d)", log_ctx,
+                                         e.status_code, attempt + 1, timeouts)
+                            raise e
+                        try:
+                            delay = float(e.response.headers.get("retry-after", ""))
+                        except ValueError:
+                            delay = 2 ** attempt + random.random()  # jitter, per Typhoon rate-limit docs
+                        logger.warning("%s API HTTP %s after %.1fs, retry in %.0fs (attempt %d/%d)", log_ctx,
+                                       e.status_code, time.monotonic() - started, min(delay, 60),
+                                       attempt + 1, self.config.MAX_RETRIES)
+                        await asyncio.sleep(min(delay, 60))
+                    else:
+                        logger.error("%s API HTTP %s (not retryable): %s", log_ctx, e.status_code, e)
+                        raise e
+                except Exception as e:
                     raise e
-            except Exception as e:
-                raise e
 
     def _resolve_model_name(self, model: Optional[str]) -> str:
         """Resolve model name from request value or environment fallback."""
@@ -255,8 +317,10 @@ class TyphoonOCRService:
         else:
             _repetition_penalty = self.config.REPETITION_PENALTY
 
+        ctx = f"[{os.path.basename(file_path)} p{page_num}]"
         try:
             # File reading and image processing is CPU bound, offload to thread pool
+            render_started = time.monotonic()
             messages = await asyncio.to_thread(
                 prepare_ocr_messages,
                 file_path,
@@ -268,9 +332,12 @@ class TyphoonOCRService:
             )
 
             image_base64 = self._extract_image_base64(messages)
+            logger.debug("%s rendered in %.1fs (%d KB base64)", ctx, time.monotonic() - render_started,
+                         len(image_base64) // 1024)
 
             response = await self._call_api_with_retry(
                 self.client.chat.completions.create,
+                log_ctx=ctx,
                 model=resolved_model,
                 messages=messages,
                 max_tokens=_max_tokens,
@@ -286,6 +353,12 @@ class TyphoonOCRService:
                 token_count = int(response.usage.total_tokens)
 
             content = response.choices[0].message.content
+            finish_reason = response.choices[0].finish_reason
+            logger.info("%s done: %d tokens, %d chars, finish_reason=%s", ctx, token_count, len(content or ""),
+                        finish_reason)
+            if finish_reason == "length":
+                logger.warning("%s output hit max_tokens (%d): likely repetition loop, text truncated", ctx,
+                               _max_tokens)
             text = self._parse_response_text(content, task_type=task_type)
 
             return (
@@ -299,6 +372,7 @@ class TyphoonOCRService:
             )
 
         except Exception as e:
+            logger.error("%s FAILED: %s: %s", ctx, type(e).__name__, e, exc_info=logger.isEnabledFor(logging.DEBUG))
             return (
                 OcrPageResult(
                     page=page_num,

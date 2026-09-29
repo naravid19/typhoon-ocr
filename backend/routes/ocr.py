@@ -6,6 +6,7 @@ FastAPI routes for OCR processing endpoints.
 """
 
 import json
+import logging
 import os
 import tempfile
 import shutil
@@ -21,6 +22,7 @@ from services.ocr_service import get_ocr_service, OcrResult, OcrPageResult
 
 
 router = APIRouter(tags=["OCR"])
+logger = logging.getLogger("typhoon.api")
 
 
 class OcrPageResponse(BaseModel):
@@ -267,7 +269,9 @@ async def process_ocr_stream(
         service = get_ocr_service()
         total_tokens = 0
         results = []
-        
+        tasks: list = []
+        name = file.filename
+
         # 1. Send massive padding and a "connecting" signal IMMEDIATELY
         # Increase padding to 4KB for even better buffer flushing
         padding = ":" + " " * 4096 + "\n\n"
@@ -289,7 +293,9 @@ async def process_ocr_stream(
                 target_pages = [1]
             
             total_targets = len(target_pages)
-            
+            logger.info("[%s] stream start: %d/%d pages, task_type=%s, model=%s", name, total_targets,
+                        total_pages_in_doc, task_type, model)
+
             # 3. Send the official START event
             yield f"data: {json.dumps({'type': 'start', 'total_pages': total_targets, 'total': total_targets})}\n\n"
             
@@ -319,10 +325,14 @@ async def process_ocr_stream(
                 
                 import asyncio
                 # Wait for the task to complete, sending keep-alive pings every 5 seconds
+                waited = 0
                 while not task.done():
                     try:
                         await asyncio.wait_for(asyncio.shield(task), timeout=5.0)
                     except asyncio.TimeoutError:
+                        waited += 5
+                        if waited % 30 == 0:
+                            logger.warning("[%s] still waiting for page %d (%ds)", name, target_pages[idx-1], waited)
                         yield f": keep-alive\n\n"
                         continue
                 
@@ -350,12 +360,21 @@ async def process_ocr_stream(
             error_msgs = [f"Page {r.page}: {r.error}" for r in results if not r.success]
             overall_error = " | ".join(error_msgs) if error_msgs else None
             
+            logger.info("[%s] stream complete: %d/%d pages ok, %d tokens, %.1fs", name,
+                        sum(r.success for r in results), len(results), total_tokens, processing_time)
             yield f"data: {json.dumps({'type': 'complete', 'success': all(r.success for r in results), 'results': final_results, 'total_tokens': total_tokens, 'processing_time': processing_time, 'error': overall_error})}\n\n"
-            
+
         except Exception as e:
+            logger.exception("[%s] stream error", name)
             yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
-        
+
         finally:
+            # Client disconnect / error: stop orphaned pages so they don't hold the shared API gate
+            pending = [t for t in tasks if not t.done()]
+            if pending:
+                logger.warning("[%s] stream ended early, cancelling %d pending pages", name, len(pending))
+                for t in pending:
+                    t.cancel()
             # Cleanup temp files
             shutil.rmtree(temp_dir, ignore_errors=True)
     

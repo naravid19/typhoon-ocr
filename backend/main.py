@@ -26,6 +26,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from routes.ocr import router as ocr_router
 from routes.env import router as env_router
 
+import logging
+# LOG_LEVEL: DEBUG | INFO (default) | WARNING | ERROR — read after routes import so .env is loaded
+logging.basicConfig(
+    level=os.getenv("LOG_LEVEL", "INFO").upper(),
+    format="%(asctime)s %(levelname)-7s %(name)s: %(message)s",
+    datefmt="%H:%M:%S",
+)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
