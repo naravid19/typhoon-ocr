@@ -95,6 +95,11 @@ function OcrPageContent() {
       setActiveSlotId(pendingSlots[0].id);
     }
 
+    // Stacked (narrow) layout: bring the results into view so progress is visible
+    if (window.matchMedia("(max-width: 1023px)").matches) {
+      document.getElementById("results-panel")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
     let succeededCount = 0;
     let failedCount = 0;
     let partialCount = 0;
@@ -191,7 +196,8 @@ function OcrPageContent() {
     <div suppressHydrationWarning className="h-screen bg-[#09090b] flex flex-col font-sans overflow-hidden">
       <Navbar />
 
-      <main className="flex-1 flex pt-13 overflow-hidden">
+      {/* Below lg the sidebar and results stack and the page scrolls; from lg up they sit side by side */}
+      <main className="flex-1 flex flex-col lg:flex-row pt-13 overflow-y-auto lg:overflow-hidden">
         <ConfigPanel
           options={options}
           setOptions={setOptions}
@@ -207,7 +213,7 @@ function OcrPageContent() {
           onToggleSound={setSoundEnabled}
         />
 
-        <div className="flex-1 flex flex-col h-full relative min-w-0">
+        <div id="results-panel" className="flex-1 flex flex-col relative min-w-0 min-h-[85vh] lg:min-h-0 lg:h-full">
           {error && (
             <div className="absolute top-4 left-4 right-4 z-50 bg-red-500/10 border border-red-500/20 text-red-200 px-4 py-3 rounded-lg flex items-center gap-2 backdrop-blur-md animate-in fade-in slide-in-from-top-2">
               <AlertCircle size={18} />

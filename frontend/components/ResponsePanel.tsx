@@ -231,9 +231,20 @@ export function ResponsePanel({
   const currentResultPage = result?.results[currentPageIndex];
   const totalResultPages = result?.results.length || 0;
 
-  const MAX_VISIBLE_TABS = 5;
-  const visibleTabs = slots.slice(0, MAX_VISIBLE_TABS);
-  const overflowTabs = slots.slice(MAX_VISIBLE_TABS);
+  // Keep the selected file's tab in view when there are more tabs than fit
+  useEffect(() => {
+    if (activeSlotId) document.getElementById(`slot-tab-${activeSlotId}`)?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }, [activeSlotId, slots.length]);
+
+  const handleTabKeyDown = (e: React.KeyboardEvent) => {
+    const step = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
+    if (!step || slots.length === 0) return;
+    e.preventDefault();
+    const current = Math.max(0, slots.findIndex((s) => s.id === activeSlotId));
+    const next = slots[(current + step + slots.length) % slots.length];
+    setActiveSlotId(next.id);
+    document.getElementById(`slot-tab-${next.id}`)?.focus();
+  };
 
   return (
     <div 
@@ -243,15 +254,23 @@ export function ResponsePanel({
       
       {/* File Slots Tab Bar */}
       {slots.length > 0 && (
-        <div className="flex items-center gap-1 px-3 pt-1.5 border-b border-white/[0.08] overflow-x-auto scrollbar-none shrink-0 bg-[#0d0d10]">
-          {visibleTabs.map((slot) => (
+        <div
+          role="tablist"
+          aria-label="Documents"
+          onKeyDown={handleTabKeyDown}
+          className="flex items-center gap-1 px-3 pt-1.5 border-b border-white/[0.08] overflow-x-auto scrollbar-thin shrink-0 bg-[#0d0d10]"
+        >
+          {slots.map((slot) => (
             <button
               key={slot.id}
+              id={`slot-tab-${slot.id}`}
               role="tab"
               aria-selected={slot.id === activeSlotId}
+              tabIndex={slot.id === (activeSlotId ?? slots[0]?.id) ? 0 : -1}
+              title={slot.file.name}
               onClick={() => setActiveSlotId(slot.id)}
               className={cn(
-                "flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-t-md border-b-2 transition-all whitespace-nowrap cursor-pointer",
+                "flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-t-md border-b-2 transition-all whitespace-nowrap cursor-pointer shrink-0",
                 slot.id === activeSlotId
                   ? "border-violet-500 text-white bg-zinc-900"
                   : "border-transparent text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/50"
@@ -261,37 +280,18 @@ export function ResponsePanel({
                 <Loader2 size={12} className="text-violet-400 animate-spin inline-block" />
               )}
               {slot.error && <span className="w-1.5 h-1.5 rounded-full bg-red-500" />}
-              {slot.result && !slot.error && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />}
+              {slot.result && !slot.error && (
+                <span
+                  className={cn(
+                    "w-1.5 h-1.5 rounded-full",
+                    slot.result.results.some((r) => !r.success || r.truncated) ? "bg-amber-400" : "bg-emerald-400"
+                  )}
+                />
+              )}
               {!slot.isLoading && !slot.error && !slot.result && <span className="w-1.5 h-1.5 rounded-full bg-zinc-600" />}
               <span className="max-w-[130px] truncate">{slot.file.name.replace(/\.[^.]+$/, "")}</span>
             </button>
           ))}
-          
-          {overflowTabs.length > 0 && (
-            <div className="relative group">
-              <button className={cn(
-                "px-2.5 py-1.5 text-xs transition-colors cursor-pointer flex items-center gap-1",
-                overflowTabs.some((s) => s.id === activeSlotId)
-                  ? "text-violet-400 font-medium border-b-2 border-violet-500"
-                  : "text-zinc-400 hover:text-zinc-200"
-              )}>
-                +{overflowTabs.length} more <ChevronDown size={12} />
-              </button>
-              <div className="absolute left-0 top-full mt-1 w-52 bg-zinc-900 border border-zinc-800 rounded-md shadow-xl hidden group-hover:block group-focus-within:block z-50">
-                {overflowTabs.map((slot) => (
-                  <button
-                    key={slot.id}
-                    onClick={() => setActiveSlotId(slot.id)}
-                    className="w-full text-left px-3 py-2 text-xs text-zinc-300 hover:bg-zinc-800 truncate cursor-pointer flex items-center gap-2"
-                  >
-                    {slot.isLoading && <Loader2 size={12} className="text-violet-400 animate-spin" />}
-                    {slot.result && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />}
-                    <span className="truncate">{slot.file.name}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
       )}
 

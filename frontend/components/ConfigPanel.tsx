@@ -291,7 +291,7 @@ export function ConfigPanel({
   const totalCount = slots.length;
 
   return (
-    <aside className="flex flex-col h-full bg-[#0d0d10] border-r border-white/[0.08] w-full lg:w-[380px] xl:w-[410px] shrink-0">
+    <aside className="flex flex-col lg:h-full bg-[#0d0d10] border-b lg:border-b-0 lg:border-r border-white/[0.08] w-full lg:w-[380px] xl:w-[410px] shrink-0">
       
       {/* Model Selector Header */}
       <div className="p-4 border-b border-white/[0.08] bg-[#09090b]">
