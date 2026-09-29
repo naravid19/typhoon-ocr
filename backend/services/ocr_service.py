@@ -8,6 +8,7 @@ Handles document processing, API calls, and result formatting using asynchronous
 
 import asyncio
 import base64
+import hashlib
 import json
 import logging
 import os
@@ -47,6 +48,12 @@ class Config:
         "TYPHOON_RATE_LIMIT_RPS", "2" if "opentyphoon.ai" in os.getenv("TYPHOON_BASE_URL", "https://api.opentyphoon.ai/v1") else "0")))
     RATE_LIMIT_RPM: int = field(default_factory=lambda: int(os.getenv(
         "TYPHOON_RATE_LIMIT_RPM", "20" if "opentyphoon.ai" in os.getenv("TYPHOON_BASE_URL", "https://api.opentyphoon.ai/v1") else "0")))
+    FIRST_PASS_MAX_TOKENS: int = field(default_factory=lambda: int(os.getenv("TYPHOON_FIRST_PASS_MAX_TOKENS", "4096")))
+    # Per-page result cache. Set TYPHOON_CACHE_DIR="" to disable.
+    CACHE_DIR: Optional[Path] = field(default_factory=lambda: (
+        (Path(os.environ["TYPHOON_CACHE_DIR"]) if os.environ["TYPHOON_CACHE_DIR"] else None)
+        if "TYPHOON_CACHE_DIR" in os.environ else Path(__file__).resolve().parent.parent / ".cache"))
+    SLOW_FAIL_SECONDS: float = 60.0  # a connection error after this long counts as a stuck page, not a blip
     MAX_RETRIES: int = 5
     MAX_TIMEOUT_RETRIES: int = 2  # attempts allowed to time out (408 / client timeout) before failing the page
     IMAGE_DIM: int = 1800
@@ -61,6 +68,7 @@ class OcrPageResult:
     text: str = ""
     image_base64: str = ""
     error: Optional[str] = None
+    truncated: bool = False  # model hit max_tokens; text is partial
 
 
 @dataclass
@@ -71,6 +79,18 @@ class OcrResult:
     total_tokens: int = 0
     processing_time: float = 0.0
     error: Optional[str] = None
+
+
+# A 1-20 char unit repeated 20+ times: dot leaders / runaway generation
+_REPEAT = re.compile(r"(.{1,20}?)\1{19,}", re.DOTALL)
+
+
+def _is_repetitive(text: Optional[str]) -> bool:
+    return bool(text and _REPEAT.search(text))
+
+
+def _collapse_repeats(text: str) -> str:
+    return _REPEAT.sub(lambda m: m.group(1) * 5, text)
 
 
 def _apply_windows_patches() -> None:
@@ -161,6 +181,32 @@ class TyphoonOCRService:
                 logger.debug("rate limiter: waiting %.1fs", wait)
                 await asyncio.sleep(wait)
 
+    def _cache_path(self, image_base64: str, *params: Any) -> Optional[Path]:
+        """Cache key = rendered page image + every parameter that changes the output (file name is irrelevant)."""
+        if not self.config.CACHE_DIR or not image_base64:
+            return None
+        digest = hashlib.sha256(json.dumps([image_base64, *params]).encode()).hexdigest()
+        return Path(self.config.CACHE_DIR) / f"{digest}.json"
+
+    @staticmethod
+    def _cache_read(path: Optional[Path]) -> Optional[str]:
+        try:
+            return json.loads(path.read_text(encoding="utf-8"))["text"] if path else None
+        except (OSError, ValueError, KeyError):
+            return None
+
+    @staticmethod
+    def _cache_write(path: Optional[Path], text: str) -> None:
+        if not path:
+            return
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            tmp = path.with_suffix(".tmp")
+            tmp.write_text(json.dumps({"text": text}, ensure_ascii=False), encoding="utf-8")
+            tmp.replace(path)
+        except OSError as e:  # cache is best-effort; never fail a page over it
+            logger.warning("cache write failed: %s", e)
+
     def get_page_count(self, file_path: str) -> int:
         """Safely retrieves page count for PDFs; returns 1 for images."""
         try:
@@ -191,7 +237,8 @@ class TyphoonOCRService:
                 except (APIConnectionError, APITimeoutError) as e:
                     logger.warning("%s API %s after %.1fs (attempt %d/%d)", log_ctx, type(e).__name__,
                                    time.monotonic() - started, attempt + 1, self.config.MAX_RETRIES)
-                    if isinstance(e, APITimeoutError):
+                    # Typhoon may drop the socket after ~176s instead of answering 408: same stuck page
+                    if isinstance(e, APITimeoutError) or time.monotonic() - started >= self.config.SLOW_FAIL_SECONDS:
                         timeouts += 1
                     if attempt == self.config.MAX_RETRIES - 1 or timeouts >= self.config.MAX_TIMEOUT_RETRIES:
                         raise e
@@ -335,38 +382,64 @@ class TyphoonOCRService:
             logger.debug("%s rendered in %.1fs (%d KB base64)", ctx, time.monotonic() - render_started,
                          len(image_base64) // 1024)
 
-            response = await self._call_api_with_retry(
-                self.client.chat.completions.create,
-                log_ctx=ctx,
-                model=resolved_model,
-                messages=messages,
-                max_tokens=_max_tokens,
-                extra_body={
-                    "repetition_penalty": _repetition_penalty,
-                    "temperature": _temperature,
-                    "top_p": _top_p
-                }
-            )
+            cache_file = self._cache_path(image_base64, resolved_model, task_type, _max_tokens, _temperature,
+                                          _top_p, _repetition_penalty, figure_language)
+            cached = self._cache_read(cache_file)
+            if cached is not None:
+                logger.info("%s cache hit, no API call", ctx)
+                return OcrPageResult(page=page_num, success=True, text=cached, image_base64=image_base64), 0
 
             token_count = 0
-            if hasattr(response, "usage") and response.usage and getattr(response.usage, "total_tokens", None):
-                token_count = int(response.usage.total_tokens)
+            # Small first pass: a page the model loops on then ends in ~30s instead of stalling to the 180s server timeout
+            call_max_tokens = min(_max_tokens, self.config.FIRST_PASS_MAX_TOKENS)
+            for attempt in range(2):
+                response = await self._call_api_with_retry(
+                    self.client.chat.completions.create,
+                    log_ctx=ctx,
+                    model=resolved_model,
+                    messages=messages,
+                    max_tokens=call_max_tokens,
+                    extra_body={
+                        "repetition_penalty": _repetition_penalty,
+                        "temperature": _temperature,
+                        "top_p": _top_p
+                    }
+                )
 
-            content = response.choices[0].message.content
-            finish_reason = response.choices[0].finish_reason
-            logger.info("%s done: %d tokens, %d chars, finish_reason=%s", ctx, token_count, len(content or ""),
-                        finish_reason)
-            if finish_reason == "length":
-                logger.warning("%s output hit max_tokens (%d): likely repetition loop, text truncated", ctx,
-                               _max_tokens)
+                if hasattr(response, "usage") and response.usage and getattr(response.usage, "total_tokens", None):
+                    token_count += int(response.usage.total_tokens)
+
+                content = response.choices[0].message.content
+                finish_reason = response.choices[0].finish_reason
+                logger.info("%s done: %d tokens, %d chars, finish_reason=%s", ctx, token_count, len(content or ""),
+                            finish_reason)
+                if finish_reason != "length":
+                    break
+                logger.warning("%s output hit max_tokens (%d)", ctx, call_max_tokens)
+                if attempt == 0 and _is_repetitive(content):
+                    _repetition_penalty += 0.2
+                    logger.warning("%s repetition loop, retrying with repetition_penalty=%.1f", ctx,
+                                   _repetition_penalty)
+                    continue
+                if attempt == 0 and call_max_tokens < _max_tokens:
+                    call_max_tokens = _max_tokens  # dense page, not a loop: give it the full budget
+                    continue
+                break
+
+            truncated = finish_reason == "length"
             text = self._parse_response_text(content, task_type=task_type)
+            if truncated:
+                text = _collapse_repeats(text)
+            else:
+                self._cache_write(cache_file, text)  # partial pages stay uncached so a retry can do better
 
             return (
                 OcrPageResult(
                     page=page_num,
                     success=True,
                     text=text,
-                    image_base64=image_base64
+                    image_base64=image_base64,
+                    truncated=truncated,
                 ),
                 token_count
             )

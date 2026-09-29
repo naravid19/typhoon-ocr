@@ -32,6 +32,7 @@ class OcrPageResponse(BaseModel):
     text: str = ""
     image_base64: str = ""
     error: Optional[str] = None
+    truncated: bool = False
 
 
 class OcrResponse(BaseModel):
@@ -136,7 +137,8 @@ async def process_ocr(
                     success=r.success,
                     text=r.text,
                     image_base64=r.image_base64,
-                    error=r.error
+                    error=r.error,
+                    truncated=r.truncated
                 )
                 for r in result.results
             ],
@@ -341,7 +343,7 @@ async def process_ocr_stream(
                 total_tokens += page_tokens
 
                 # Send page complete event
-                yield f"data: {json.dumps({'type': 'page_complete', 'page': page_result.page, 'success': page_result.success, 'text': page_result.text[:200] + '...' if len(page_result.text) > 200 else page_result.text, 'image_base64': page_result.image_base64[:100] if page_result.image_base64 else '', 'error': page_result.error})}\n\n"
+                yield f"data: {json.dumps({'type': 'page_complete', 'page': page_result.page, 'success': page_result.success, 'text': page_result.text[:200] + '...' if len(page_result.text) > 200 else page_result.text, 'image_base64': page_result.image_base64[:100] if page_result.image_base64 else '', 'error': page_result.error, 'truncated': page_result.truncated})}\n\n"
             
             processing_time = round(time.time() - start_time, 2)
             
@@ -352,7 +354,8 @@ async def process_ocr_stream(
                     'success': r.success,
                     'text': r.text,
                     'image_base64': r.image_base64,
-                    'error': r.error
+                    'error': r.error,
+                    'truncated': r.truncated
                 }
                 for r in results
             ]
