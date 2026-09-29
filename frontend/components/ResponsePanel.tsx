@@ -19,10 +19,12 @@ import {
   ZoomIn,
   Maximize2,
   FileCode,
-  Loader2
+  Loader2,
+  AlertTriangle,
+  RotateCcw
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { OcrOptions, FileSlot } from "@/types/ocr";
+import { OcrOptions, FileSlot, OcrPageResult } from "@/types/ocr";
 import { markdownToPlainText } from "@/utils/markdownText";
 import {
   slotToMarkdown,
@@ -82,6 +84,28 @@ const CodeGenerator = dynamic(() => import("./CodeGenerator").then(mod => mod.Co
   loading: () => <div className="h-10 bg-[#0d0d10] animate-pulse" />
 });
 
+// Banner for a page that failed or came back partial (model got stuck repeating itself)
+function PageNotice({ page }: { page?: OcrPageResult }) {
+  if (!page || (page.success && !page.truncated)) return null;
+  const failed = !page.success;
+  return (
+    <div
+      role="status"
+      className={cn(
+        "mb-4 flex items-start gap-2 rounded-md border px-3 py-2 text-xs",
+        failed ? "border-red-500/30 bg-red-500/10 text-red-200" : "border-amber-500/30 bg-amber-500/10 text-amber-200"
+      )}
+    >
+      <AlertTriangle size={13} className="mt-0.5 shrink-0" />
+      <span>
+        {failed
+          ? `Page ${page.page} failed: ${page.error ?? "unknown error"}. Use Retry to re-send it.`
+          : `Page ${page.page} is partial: the model got stuck repeating itself and the text was cut. Use Retry to try again.`}
+      </span>
+    </div>
+  );
+}
+
 function ProcessingTimer() {
   const [elapsedTime, setElapsedTime] = useState(0);
 
@@ -107,6 +131,7 @@ interface ResponsePanelProps {
   setActiveSlotId: (id: string) => void;
   options: OcrOptions;
   isLoading: boolean;
+  onRetryFailed?: (slotId: string) => void;
 }
 
 export function ResponsePanel({
@@ -114,7 +139,8 @@ export function ResponsePanel({
   activeSlotId,
   setActiveSlotId,
   options,
-  isLoading
+  isLoading,
+  onRetryFailed
 }: ResponsePanelProps) {
   const [copiedMode, setCopiedMode] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"combined" | "compare">("compare");
@@ -134,6 +160,7 @@ export function ResponsePanel({
 
   const activeSlot = slots.find((s) => s.id === activeSlotId) ?? null;
   const result = activeSlot?.result ?? null;
+  const problemPages = result?.results.filter((r) => !r.success || r.truncated) ?? [];
   const doneSlots = slots.filter((s) => s.result && !s.error);
   const hasAnyResult = doneSlots.length > 0;
 
@@ -211,7 +238,7 @@ export function ResponsePanel({
   return (
     <div 
       suppressHydrationWarning 
-      className={cn("flex-1 flex flex-col h-full bg-[#09090b] relative overflow-hidden", isDragging && "select-none")}
+      className={cn("flex-1 flex flex-col h-full min-w-0 bg-[#09090b] relative overflow-hidden", isDragging && "select-none")}
     >
       
       {/* File Slots Tab Bar */}
@@ -330,6 +357,17 @@ export function ResponsePanel({
         <div className="flex items-center gap-3">
           {result && (
             <div className="flex items-center gap-2">
+              {problemPages.length > 0 && activeSlot && onRetryFailed && (
+                <button
+                  onClick={() => onRetryFailed(activeSlot.id)}
+                  disabled={activeSlot.isLoading}
+                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-amber-500/10 border border-amber-500/30 text-amber-300 text-[11px] font-medium hover:bg-amber-500/20 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                  title="Re-send only the failed or truncated pages; successful pages are kept"
+                >
+                  {activeSlot.isLoading ? <Loader2 size={11} className="animate-spin" /> : <RotateCcw size={11} />}
+                  <span>Retry {problemPages.length} page{problemPages.length === 1 ? "" : "s"}</span>
+                </button>
+              )}
               <div className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-zinc-900 border border-white/[0.06] text-zinc-300 text-[11px] font-mono tabular-nums">
                 <Zap size={11} className="text-violet-400" />
                 <span>{result.total_tokens.toLocaleString()} tokens</span>
@@ -539,6 +577,7 @@ export function ResponsePanel({
                           </span>
                         </div>
                       )}
+                      <PageNotice page={pageResult} />
                       <MarkdownContent text={pageResult.text} />
                     </div>
                   ))}
@@ -561,7 +600,7 @@ export function ResponsePanel({
                 
                 {/* Left Pane: Original Input Document */}
                 <div 
-                  className="flex flex-col bg-[#0d0d10] border-r border-white/[0.08] overflow-hidden"
+                  className="flex flex-col min-w-0 bg-[#0d0d10] border-r border-white/[0.08] overflow-hidden"
                   style={{ width: `${splitRatio}%` }}
                 >
                   {/* Pane Header with Zoom Controls and Quick Page Pills */}
@@ -617,8 +656,13 @@ export function ResponsePanel({
                             "px-2 py-0.5 text-[10px] font-mono rounded transition-colors shrink-0",
                             currentPageIndex === idx
                               ? "bg-violet-600 text-white font-medium"
-                              : "text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
+                              : !p.success
+                                ? "text-red-400 bg-red-500/10 hover:bg-red-500/20"
+                                : p.truncated
+                                  ? "text-amber-300 bg-amber-500/10 hover:bg-amber-500/20"
+                                  : "text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
                           )}
+                          title={!p.success ? `Failed: ${p.error ?? "unknown error"}` : p.truncated ? "Truncated: model looped, text is partial" : undefined}
                         >
                           P.{p.page}
                         </button>
@@ -646,6 +690,7 @@ export function ResponsePanel({
                   </div>
 
                   <div className="flex-1 overflow-y-auto p-6 scrollbar-thin select-text">
+                    <PageNotice page={currentResultPage} />
                     <MarkdownContent text={currentResultPage?.text || ""} />
                   </div>
                 </div>

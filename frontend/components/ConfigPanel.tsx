@@ -546,6 +546,36 @@ export function ConfigPanel({
           )}
         </div>
 
+        {/* Section 2b: Multi-file run mode */}
+        {slots.length > 1 && (
+          <div className="space-y-2.5 pt-3 border-t border-white/[0.08]">
+            <label className="text-xs text-zinc-300 font-medium">Multi-file Run Mode</label>
+            <div className="grid grid-cols-2 gap-1 p-1 bg-zinc-900 border border-zinc-800 rounded-md">
+              {([
+                ["sequential", "ทีละไฟล์ (แนะนำ)"],
+                ["parallel", "พร้อมกัน"],
+              ] as const).map(([mode, label]) => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => handleChange("file_mode", mode)}
+                  className={cn(
+                    "py-1.5 text-xs font-medium rounded transition-all",
+                    (options.file_mode ?? "sequential") === mode
+                      ? "bg-zinc-800 text-white shadow-xs"
+                      : "text-zinc-500 hover:text-zinc-300"
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <p className="text-[10px] leading-relaxed text-zinc-500">
+              Typhoon จำกัด 20 หน้า/นาทีทุกไฟล์รวมกัน ทีละไฟล์ = ไฟล์แรกเสร็จเร็วสุด, พร้อมกัน = ทุกไฟล์เสร็จพร้อมกันตอนท้าย เวลารวมเท่ากัน
+            </p>
+          </div>
+        )}
+
         {/* Section 3: Advanced Inference Controls Accordion */}
         <div className="space-y-3 pt-3 border-t border-white/[0.08]">
           <button

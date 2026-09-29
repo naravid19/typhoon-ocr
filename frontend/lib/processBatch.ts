@@ -1,7 +1,9 @@
 import { FileSlot, OcrOptions, OcrResult } from "@/types/ocr";
 import { processOcrWithProgress, OcrProgress } from "@/lib/api";
 
-const CONCURRENCY = 3; // ponytail: sliding window worker queue
+// Typhoon's quota is shared (20 req/min), so extra parallel files only delay every file's finish.
+// ponytail: sliding window worker queue
+const CONCURRENCY = { sequential: 1, parallel: 3 };
 
 export async function processBatch(
   slots: FileSlot[],
@@ -20,16 +22,16 @@ export async function processBatch(
           options,
           (progress) => onProgress(slot.id, progress)
         );
-        const errMessage = !result.success ? (result.error ?? "Processing failed") : null;
-        onSlotDone(slot.id, result.success ? result : null, errMessage);
+        // Keep the result when any page worked: failed pages are flagged in the UI and can be retried
+        const usable = result.results?.some((r) => r.success) ?? false;
+        onSlotDone(slot.id, usable ? result : null, usable ? null : (result.error ?? "Processing failed"));
       } catch (err) {
         onSlotDone(slot.id, null, err instanceof Error ? err.message : "Unknown error");
       }
     }
   }
 
-  const workerCount = Math.min(CONCURRENCY, slots.length);
+  const workerCount = Math.min(CONCURRENCY[options.file_mode ?? "sequential"], slots.length);
   const workers = Array.from({ length: workerCount }, () => worker());
   await Promise.all(workers);
 }
-

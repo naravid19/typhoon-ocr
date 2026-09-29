@@ -7,7 +7,9 @@ function basename(filename: string): string {
 
 export function slotToMarkdown(slot: FileSlot): string {
   if (!slot.result) return "";
-  return slot.result.results.map((r) => r.text).join("\n\n");
+  return slot.result.results
+    .map((r) => (r.success ? r.text : `<!-- Page ${r.page} failed: ${r.error ?? "unknown error"} -->`))
+    .join("\n\n");
 }
 
 export function mergeSlotsMarkdown(slots: FileSlot[]): string {

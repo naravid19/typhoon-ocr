@@ -5,9 +5,17 @@ import { Navbar } from "@/components/Navbar";
 import { ConfigPanel } from "@/components/ConfigPanel";
 import { ResponsePanel } from "@/components/ResponsePanel";
 import { NotificationProvider, useNotificationContext } from "@/providers/NotificationProvider";
-import { OcrOptions, FileSlot } from "@/types/ocr";
+import { OcrOptions, FileSlot, FileMode } from "@/types/ocr";
 import { processBatch } from "@/lib/processBatch";
+import { processOcrWithProgress } from "@/lib/api";
 import { AlertCircle } from "lucide-react";
+
+function savedFileMode(): FileMode {
+  try {
+    if (localStorage.getItem("ocr.file_mode") === "parallel") return "parallel";
+  } catch { /* storage unavailable: use the default */ }
+  return "sequential";
+}
 
 function OcrPageContent() {
   const [mounted, setMounted] = useState(false);
@@ -30,6 +38,7 @@ function OcrPageContent() {
     setTimeout(() => setMounted(true), 0);
   }, []);
 
+  // (page renders a placeholder until mounted, so reading storage here cannot cause a hydration mismatch)
   const [options, setOptions] = useState<OcrOptions>({
     model: "typhoon-ocr",
     task_type: "v1.5",
@@ -39,7 +48,15 @@ function OcrPageContent() {
     repetition_penalty: 1.1,
     pages: "",
     figure_language: "Thai",
+    file_mode: savedFileMode(),
   });
+
+  // Remember the run-mode choice across reloads
+  useEffect(() => {
+    try {
+      if (options.file_mode) localStorage.setItem("ocr.file_mode", options.file_mode);
+    } catch { /* ignore */ }
+  }, [options.file_mode]);
 
   const updateSlot = useCallback(
     (id: string, patch: Partial<FileSlot>) =>
@@ -80,6 +97,7 @@ function OcrPageContent() {
 
     let succeededCount = 0;
     let failedCount = 0;
+    let partialCount = 0;
 
     try {
       await processBatch(
@@ -95,6 +113,7 @@ function OcrPageContent() {
         (id, result, err) => {
           if (result && !err) {
             succeededCount++;
+            if (result.results.some((r) => !r.success || r.truncated)) partialCount++;
           } else {
             failedCount++;
           }
@@ -110,7 +129,8 @@ function OcrPageContent() {
       if (succeededCount > 0) {
         toast.success(
           "ประมวลผลสำเร็จ",
-          `ประมวลผลสำเร็จ ${succeededCount} ไฟล์${failedCount > 0 ? ` (${failedCount} ไฟล์ไม่สำเร็จ)` : ""}`
+          `ประมวลผลสำเร็จ ${succeededCount} ไฟล์${failedCount > 0 ? ` (${failedCount} ไฟล์ไม่สำเร็จ)` : ""}` +
+            (partialCount > 0 ? ` — ${partialCount} ไฟล์มีบางหน้าล้มเหลวหรือถูกตัด (กด Retry ได้)` : "")
         );
         notify("ประมวลผลสำเร็จ", { body: `ประมวลผลเสร็จสิ้น ${succeededCount} ไฟล์` });
       } else {
@@ -123,6 +143,43 @@ function OcrPageContent() {
       toast.error("เกิดข้อผิดพลาด", errorMessage);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // Re-send only the failed/truncated pages of one file and merge them into its existing result.
+  // Pages that already succeeded are neither re-sent nor changed.
+  const handleRetryFailed = async (id: string) => {
+    const slot = slots.find((s) => s.id === id);
+    const previous = slot?.result;
+    if (!slot || !previous) return;
+    const pages = previous.results.filter((r) => !r.success || r.truncated).map((r) => r.page);
+    if (pages.length === 0) return;
+
+    updateSlot(id, { isLoading: true });
+    try {
+      const retry = await processOcrWithProgress(
+        slot.file,
+        { ...options, pages: pages.join(",") },
+        (p) => updateSlot(id, { currentPage: p.current ?? 0, totalPages: p.total ?? 0 })
+      );
+      const byPage = new Map(retry.results.map((r) => [r.page, r]));
+      const merged = previous.results.map((r) => byPage.get(r.page) ?? r);
+      updateSlot(id, {
+        isLoading: false,
+        result: {
+          ...previous,
+          results: merged,
+          success: merged.every((r) => r.success && !r.truncated),
+          total_tokens: previous.total_tokens + retry.total_tokens,
+          processing_time: previous.processing_time + retry.processing_time,
+        },
+      });
+      const remaining = merged.filter((r) => !r.success || r.truncated).length;
+      if (remaining === 0) toast.success("Retry สำเร็จ", `แก้ไข ${pages.length} หน้าเรียบร้อย`);
+      else toast.error("ยังมีหน้าที่ไม่สำเร็จ", `เหลือ ${remaining} หน้า`);
+    } catch (err) {
+      updateSlot(id, { isLoading: false }); // keep the existing result
+      toast.error("Retry ไม่สำเร็จ", err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
     }
   };
 
@@ -150,7 +207,7 @@ function OcrPageContent() {
           onToggleSound={setSoundEnabled}
         />
 
-        <div className="flex-1 flex flex-col h-full relative">
+        <div className="flex-1 flex flex-col h-full relative min-w-0">
           {error && (
             <div className="absolute top-4 left-4 right-4 z-50 bg-red-500/10 border border-red-500/20 text-red-200 px-4 py-3 rounded-lg flex items-center gap-2 backdrop-blur-md animate-in fade-in slide-in-from-top-2">
               <AlertCircle size={18} />
@@ -170,6 +227,7 @@ function OcrPageContent() {
             setActiveSlotId={setActiveSlotId}
             options={options}
             isLoading={isLoading}
+            onRetryFailed={handleRetryFailed}
           />
         </div>
       </main>

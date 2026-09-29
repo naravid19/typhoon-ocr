@@ -1,5 +1,7 @@
 export type OcrTaskType = "default" | "structure" | "v1.5";
 export type FigureLanguage = "Thai" | "English";
+// sequential: one file at a time (each finishes sooner); parallel: several files share the API quota
+export type FileMode = "sequential" | "parallel";
 
 export interface OcrPageResult {
   page: number;
@@ -7,6 +9,7 @@ export interface OcrPageResult {
   text: string;
   image_base64?: string;
   error?: string;
+  truncated?: boolean; // model hit max_tokens; text is partial
 }
 
 export interface OcrResult {
@@ -26,6 +29,7 @@ export interface OcrOptions {
   repetition_penalty: number;
   pages?: string; 
   figure_language?: FigureLanguage;
+  file_mode?: FileMode; // client-side only, not sent to the API
 }
 
 export interface FileSlot {
