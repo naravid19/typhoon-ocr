@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **Runaway-generation handling**: Typhoon's model can loop on dot-leader forms until the server times out (~180s). The first attempt is now capped (`TYPHOON_FIRST_PASS_MAX_TOKENS`, default 4096); a looping page is retried once with a higher `repetition_penalty`, dense pages get the full budget, and pages that still loop return with the repeats collapsed and a `truncated` flag.
+- **Per-page result cache** (`backend/.cache`, `TYPHOON_CACHE_DIR`): keyed by the rendered page image and parameters, so re-runs and identical pages across files cost no API calls. Failed or truncated pages are never cached.
+- **Partial results + "Retry N pages"**: a failed page no longer discards the whole file. Failed/truncated pages are flagged (red/amber) and can be re-sent alone.
+- **Multi-file Run Mode** setting (one file at a time by default, or parallel), remembered in the browser.
+- **Settings > Advanced**: requests per minute/second, max simultaneous requests, first-attempt max tokens and log level, all also in `.env`.
+- **Logging** (`LOG_LEVEL`): per-page API attempts, timings, `finish_reason`, and 30s "still waiting" warnings.
+
+### Changed
+- **Shared rate limiter** for all files (docs: `typhoon-ocr` = 2 req/s, 20 req/min; off for non-`opentyphoon.ai` base URLs), SDK retries disabled, 429 backs off with jitter, and timeouts (408, dropped connection) are retried at most twice.
+- Below 1024px the sidebar and results stack instead of hiding the results panel.
+
+### Fixed
+- Files after the fifth were unreachable: the "+N more" tab dropdown was clipped by its scroll container. All tabs now show in a scrollable, keyboard-navigable tab list.
+- Result panel overflowed the window on many-page files, pushing the toolbar off screen.
+- Settings number fields snapped back to a default when cleared; the dialog could not scroll on short windows.
+
 ## [v1.1.2] - 2026-09-27
 
 ### Added

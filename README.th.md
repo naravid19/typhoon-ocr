@@ -195,6 +195,12 @@ pdftoppm -v
    TYPHOON_OCR_MODEL=typhoon-ocr
    # การตั้งค่าเพิ่มเติม (ทางเลือก)
    TYPHOON_MAX_FILES=10
+   # Throughput tuning (defaults shown; also editable in Settings > Advanced)
+   # TYPHOON_RATE_LIMIT_RPM=20
+   # TYPHOON_RATE_LIMIT_RPS=2
+   # TYPHOON_MAX_CONCURRENCY=8
+   # TYPHOON_FIRST_PASS_MAX_TOKENS=4096
+   # LOG_LEVEL=INFO
    ```
 
    > **โมเดลที่รองรับ:**

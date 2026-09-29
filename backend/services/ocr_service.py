@@ -48,6 +48,9 @@ class Config:
         "TYPHOON_RATE_LIMIT_RPS", "2" if "opentyphoon.ai" in os.getenv("TYPHOON_BASE_URL", "https://api.opentyphoon.ai/v1") else "0")))
     RATE_LIMIT_RPM: int = field(default_factory=lambda: int(os.getenv(
         "TYPHOON_RATE_LIMIT_RPM", "20" if "opentyphoon.ai" in os.getenv("TYPHOON_BASE_URL", "https://api.opentyphoon.ai/v1") else "0")))
+    # In-flight API calls across all files. The rate limiter sets the pace; this only has to cover call latency
+    # plus a few stuck pages, so a couple of hung calls can't starve the rest.
+    MAX_CONCURRENCY: int = field(default_factory=lambda: int(os.getenv("TYPHOON_MAX_CONCURRENCY", "8")))
     FIRST_PASS_MAX_TOKENS: int = field(default_factory=lambda: int(os.getenv("TYPHOON_FIRST_PASS_MAX_TOKENS", "4096")))
     # Per-page result cache. Set TYPHOON_CACHE_DIR="" to disable.
     CACHE_DIR: Optional[Path] = field(default_factory=lambda: (
@@ -157,7 +160,7 @@ class TyphoonOCRService:
             max_retries=0  # retries handled in _call_api_with_retry; SDK retries multiplied the storm
         )
         # One gate for ALL requests/files: per-request semaphores stacked (5 pages x 3 files = 15 upstream calls)
-        self._api_gate = asyncio.Semaphore(int(os.getenv("TYPHOON_MAX_CONCURRENCY", "3")))
+        self._api_gate = asyncio.Semaphore(self.config.MAX_CONCURRENCY)
         self._rate_lock = asyncio.Lock()  # FIFO queue for request starts
         self._request_starts: deque = deque()  # monotonic start times within the last 60s
 

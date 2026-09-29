@@ -25,7 +25,7 @@ Modern desktop & mobile web browser environment, working with complex multi-page
 ## Capabilities and Constraints
 
 - Web-based Next.js app router frontend with custom Tailwind dark glassmorphism design system.
-- Concurrent sliding-window batch queue for multi-page OCR execution (`CONCURRENCY = 3`).
+- Concurrent sliding-window batch queue for multi-page OCR execution (one file at a time by default, or 3 in parallel; user-selectable).
 - Smart OCR Resume and Auto-Retry logic for seamless recovery from rate limits (e.g. HTTP 429) or errors.
 - Automatic Git update check and pull route via workspace API routes (`/api/update/check`, `/api/update/pull`).
 - High accessibility, clear micro-interactions, responsive side-by-side preview panels.
