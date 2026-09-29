@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [v1.1.3] - 2026-09-29
 
 ### Added
 - **Runaway-generation handling**: Typhoon's model can loop on dot-leader forms until the server times out (~180s). The first attempt is now capped (`TYPHOON_FIRST_PASS_MAX_TOKENS`, default 4096); a looping page is retried once with a higher `repetition_penalty`, dense pages get the full budget, and pages that still loop return with the repeats collapsed and a `truncated` flag.
@@ -14,12 +14,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Multi-file Run Mode** setting (one file at a time by default, or parallel), remembered in the browser.
 - **Settings > Advanced**: requests per minute/second, max simultaneous requests, first-attempt max tokens and log level, all also in `.env`.
 - **Logging** (`LOG_LEVEL`): per-page API attempts, timings, `finish_reason`, and 30s "still waiting" warnings.
+- **Release-based update check**: the installed version (root `package.json`, shown in the navbar) is compared with the latest stable GitHub Release from `releases.atom`: no API rate limit, cached for 6 hours with ETag revalidation, silent when offline. The badge shows the release notes and a link to the release.
 
 ### Changed
+- **In-app update** fast-forwards to the published release tag (`git merge --ff-only`) instead of `git pull` on the branch, so unreleased commits are never pulled in. It refuses when there are uncommitted changes, when not on `master`/`main`, or when the history has diverged, and warns when dependencies changed. Copies without git get a Download button instead.
 - **Shared rate limiter** for all files (docs: `typhoon-ocr` = 2 req/s, 20 req/min; off for non-`opentyphoon.ai` base URLs), SDK retries disabled, 429 backs off with jitter, and timeouts (408, dropped connection) are retried at most twice.
 - Below 1024px the sidebar and results stack instead of hiding the results panel.
 
 ### Fixed
+- The update badge appeared when the local copy was newer than GitHub (it compared `local SHA !== remote SHA`) and stopped working once the unauthenticated GitHub API rate limit (60/hour) was hit.
 - Files after the fifth were unreachable: the "+N more" tab dropdown was clipped by its scroll container. All tabs now show in a scrollable, keyboard-navigable tab list.
 - Result panel overflowed the window on many-page files, pushing the toolbar off screen.
 - Settings number fields snapped back to a default when cleared; the dialog could not scroll on short windows.

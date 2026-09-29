@@ -89,8 +89,12 @@ This fork provides a modern **Next.js web application** alongside the original G
 - 🔗 **SSRF-Protected URL Import**: Secure document loading from remote URLs with multi-layer DNS and CIDR filtering
 - 📈 **Real-time SSE progress** indicators and elapsed latency timer during OCR processing
 - 🤖 **Smart Resume & Retry**: Automatically filter successful files and retry only rate-limited or failed files (e.g., HTTP 429) without losing queue progress
+- 🛡️ **Runaway-Generation Guard**: Detects pages where the model loops (e.g. dot-leader forms), retries once with a higher repetition penalty, and flags any page that is still partial instead of hanging for minutes
+- 🗂️ **Per-Page Result Cache**: Identical page images (re-runs, or repeated forms across files) are never sent to the API twice
+- 🔁 **Partial Results & Page Retry**: One failed page no longer discards the file. Failed and truncated pages are flagged and can be re-sent alone with **Retry N pages**
+- 🚦 **Shared Rate Limiter**: Honors Typhoon's documented 2 req/s and 20 req/min across all files, with bounded retries for stuck pages
 - ⚙️ **Dynamic Model Discovery & Limits**: Dynamically discover models (`/api/models`) and adjust `MAX_FILES` directly via the in-app Settings panel
-- 🔄 **In-App Auto-Update**: Safe one-click GitHub update (`git pull`) with sanitized parameter checking
+- 🔄 **Release-Based Update Check**: Compares the installed version with the latest stable GitHub Release (cached, no API rate limit), shows the release notes, and can fast-forward to that release in one click (`git merge --ff-only`, never unreleased commits)
 
 > **This fork focuses on Windows 10/11.** For macOS/Linux setup, please refer to the official Typhoon OCR repository.
 >
@@ -125,7 +129,7 @@ flowchart TD
     subgraph Backend["Backend — FastAPI Service (:8345)"]
         Router["/api/ocr Endpoint & SSE Stream"]
         Poppler["Poppler PDF Rasterizer<br/>(Windows Auto-Fallback)"]
-        RetryEngine["Resilient HTTP Client<br/>(Exponential Backoff & Retries)"]
+        RetryEngine["Resilient HTTP Client<br/>(Rate Limiter, Backoff, Page Cache)"]
         Router --> Poppler
         Poppler --> RetryEngine
     end
@@ -261,6 +265,8 @@ pdftoppm -v
 4. **Configure parameters** - Adjust temperature, top_p, and other OCR settings
 5. **Run OCR** - Click "Run OCR" and monitor progress
 6. **View results** - Switch between Combined and Compare views
+7. **Retry failed pages** - Pages marked red (failed) or amber (truncated) can be re-sent alone with **Retry N pages**; pages that already succeeded are kept
+8. **Tune speed** - Settings > Advanced sets requests per minute/second and simultaneous requests (Typhoon allows 20 requests/minute for `typhoon-ocr`)
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -277,17 +283,23 @@ pdftoppm -v
 - 🖼️ **Figure Visual Analysis**: Configurable figure description language (`th` / `en`) for diagram and illustration breakdowns
 - 🎯 **Dynamic Model Discovery**: Live model list synced between backend `/api/models` and frontend UI (`typhoon-ocr` 1.5 2B, `typhoon-ocr-preview` v1 7B, and custom models)
 - 🚀 **Multi-File Batch OCR**: Upload & queue up to 10 documents simultaneously
-- ⚡ **Sliding Window Concurrent Engine**: Process multiple files in parallel with low memory footprint
+- ⚡ **Multi-File Run Mode**: Run files one at a time (default, so each finishes sooner) or in parallel through a sliding-window queue; choose in the sidebar
 - ✅ Multi-page PDF selection with visual grid preview & **viewport-based lazy loading** (prevents memory lag)
 - 🛡️ **SSRF-Hardened URL Import**: Safe web document import with multi-layer IP/DNS filtering
-- 🔄 **Automatic API Retries**: Resilient exponential backoff handling of rate limits (HTTP 429) and transient server errors
+- 🔄 **Resilient API Handling**: Shared rate limiter (2 req/s, 20 req/min for `typhoon-ocr`), backoff with jitter for HTTP 429/5xx, and bounded retries for timeouts (408 / dropped connections)
+- 🛡️ **Runaway-Generation Guard**: The first attempt is capped (`TYPHOON_FIRST_PASS_MAX_TOKENS`, default 4096); looping pages are retried once with a higher repetition penalty and returned flagged `truncated` with the repeats collapsed
+- 🗂️ **Per-Page Result Cache**: Keyed by the rendered page image plus parameters (`backend/.cache`, `TYPHOON_CACHE_DIR`); failed or truncated pages are never cached
+- 🔁 **Partial Results & Retry N pages**: Failed (red) and truncated (amber) pages are flagged per page; retry only those and merge them into the existing result
+- ⚙️ **Settings > Advanced**: Requests per minute/second, max simultaneous requests, first-attempt max tokens and log level, applied without a restart
+- 🧾 **Backend Logging** (`LOG_LEVEL`): Per-page API attempts, timings, `finish_reason`, and "still waiting" warnings
 - 🪟 **Windows Poppler Auto-Fallback**: Seamless PDF rendering on Windows without manual PATH configuration
 - ✅ Shift-click for range selection & quick actions (Select All, Odd/Even pages, Custom range)
 - ⚡ **Lightning Fast Asynchronous Backend** processing pages concurrently via `asyncio`
 - ⚡ **Progressive Page Rendering**: Render multi-page markdown outputs smoothly without freezing the UI
 - 📊 **Native Table & Figure Rendering**: Embedded HTML `<table>` and `<figure>` tags rendered cleanly via `rehype-raw`
 - ✅ Real-time progress indicator per file with live status badges and elapsed latency timer
-- ✅ Tabbed results navigation with "+X more" overflow dropdown
+- ✅ Tabbed results navigation: every file gets a tab in a scrollable, keyboard-navigable list (amber dot = some pages need a retry)
+- ✅ Responsive layout: the sidebar and results stack below 1024px
 - ✅ Compare mode: Original image vs. extracted text with resizable divider
 - 📦 **Flexible Export Options**: Copy text/markdown (per-file or merged) & Download `.md` or `.zip` archives (with filename deduplication)
 - ✅ Code generator for API integration (Python, cURL, JavaScript)
@@ -312,6 +324,9 @@ pdftoppm -v
 - [x] **Precision Studio Dark UI & Resizable Compare Workbench**
 - [x] **Unified Sidebar Workspace with dynamic compact dropzone**
 - [x] **Hardened Windows CLI launcher (`start_app.bat`) with port conflict detection**
+- [x] **Runaway-generation guard, per-page cache, and shared rate limiter**
+- [x] **Partial results with per-page retry**
+- [x] **Settings > Advanced (throughput & logging) and responsive layout**
 - [ ] Support for more document types
 
 See the [open issues](https://github.com/naravid19/typhoon-ocr/issues) for a full list of proposed features (and known issues).
