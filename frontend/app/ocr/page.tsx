@@ -11,8 +11,9 @@ import { processOcrWithProgress } from "@/lib/api";
 import { AlertCircle } from "lucide-react";
 
 function savedFileMode(): FileMode {
+  if (typeof window === "undefined") return "sequential";
   try {
-    if (localStorage.getItem("ocr.file_mode") === "parallel") return "parallel";
+    if (window.localStorage.getItem("ocr.file_mode") === "parallel") return "parallel";
   } catch { /* storage unavailable: use the default */ }
   return "sequential";
 }
@@ -54,7 +55,9 @@ function OcrPageContent() {
   // Remember the run-mode choice across reloads
   useEffect(() => {
     try {
-      if (options.file_mode) localStorage.setItem("ocr.file_mode", options.file_mode);
+      if (typeof window !== "undefined" && options.file_mode) {
+        window.localStorage.setItem("ocr.file_mode", options.file_mode);
+      }
     } catch { /* ignore */ }
   }, [options.file_mode]);
 
@@ -151,13 +154,15 @@ function OcrPageContent() {
     }
   };
 
-  // Re-send only the failed/truncated pages of one file and merge them into its existing result.
+  // Re-send only the failed/truncated pages of one file (or a single requested page) and merge them into its existing result.
   // Pages that already succeeded are neither re-sent nor changed.
-  const handleRetryFailed = async (id: string) => {
+  const handleRetryFailed = async (id: string, specificPage?: number) => {
     const slot = slots.find((s) => s.id === id);
     const previous = slot?.result;
     if (!slot || !previous) return;
-    const pages = previous.results.filter((r) => !r.success || r.truncated).map((r) => r.page);
+    const pages = specificPage !== undefined
+      ? [specificPage]
+      : previous.results.filter((r) => !r.success || r.truncated).map((r) => r.page);
     if (pages.length === 0) return;
 
     updateSlot(id, { isLoading: true });

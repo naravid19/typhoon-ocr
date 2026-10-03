@@ -58,7 +58,7 @@ class Config:
         if "TYPHOON_CACHE_DIR" in os.environ else Path(__file__).resolve().parent.parent / ".cache"))
     SLOW_FAIL_SECONDS: float = 60.0  # a connection error after this long counts as a stuck page, not a blip
     MAX_RETRIES: int = 5
-    MAX_TIMEOUT_RETRIES: int = 2  # attempts allowed to time out (408 / client timeout) before failing the page
+    MAX_TIMEOUT_RETRIES: int = field(default_factory=lambda: int(os.getenv("TYPHOON_MAX_TIMEOUT_RETRIES", "3")))
     IMAGE_DIM: int = 1800
     TEXT_LENGTH: int = 8000
 
@@ -257,10 +257,11 @@ class TyphoonOCRService:
                         try:
                             delay = float(e.response.headers.get("retry-after", ""))
                         except ValueError:
-                            delay = 2 ** attempt + random.random()  # jitter, per Typhoon rate-limit docs
-                        logger.warning("%s API HTTP %s after %.1fs, retry in %.0fs (attempt %d/%d)", log_ctx,
+                            base_delay = 3.0 if e.status_code == 408 else 2.0
+                            delay = (base_delay ** attempt) + random.random()  # jitter, per Typhoon rate-limit docs
+                        logger.warning("%s API HTTP %s after %.1fs, retry in %.0fs (attempt %d/%d, timeouts %d)", log_ctx,
                                        e.status_code, time.monotonic() - started, min(delay, 60),
-                                       attempt + 1, self.config.MAX_RETRIES)
+                                       attempt + 1, self.config.MAX_RETRIES, timeouts)
                         await asyncio.sleep(min(delay, 60))
                     else:
                         logger.error("%s API HTTP %s (not retryable): %s", log_ctx, e.status_code, e)

@@ -11,6 +11,12 @@ if (typeof window !== 'undefined') {
     pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 }
 
+const PDF_OPTIONS = {
+  cMapUrl: `https://unpkg.com/pdfjs-dist@${pdfjs.version}/cmaps/`,
+  standardFontDataUrl: `https://unpkg.com/pdfjs-dist@${pdfjs.version}/standard_fonts/`,
+  wasmUrl: `https://unpkg.com/pdfjs-dist@${pdfjs.version}/wasm/`,
+};
+
 function LazyPdfPage({ pageNum }: { pageNum: number }) {
   const [isVisible, setIsVisible] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -331,6 +337,7 @@ export default function PdfPreview({ file, options, setOptions, onNumPagesChange
       {/* PDF Document Grid */}
       <Document 
         file={file} 
+        options={PDF_OPTIONS}
         onLoadSuccess={onDocumentLoadSuccess} 
         className="w-full" 
         error={<div className="text-xs text-red-400 p-2">Failed to load PDF preview</div>}

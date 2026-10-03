@@ -1,4 +1,4 @@
-import { OcrOptions, OcrResult } from "@/types/ocr";
+import { OcrOptions, OcrPageResult, OcrResult } from "@/types/ocr";
 
 export interface OcrProgress {
   type: "start" | "progress" | "page_complete" | "complete" | "error";
@@ -10,6 +10,9 @@ export interface OcrProgress {
   success?: boolean;
   text?: string;
   error?: string;
+  results?: OcrPageResult[];
+  total_tokens?: number;
+  processing_time?: number;
 }
 
 export async function processOcrWithProgress(

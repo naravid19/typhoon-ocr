@@ -35,6 +35,13 @@ import {
   downloadMerged,
 } from "@/utils/export";
 import "highlight.js/styles/github-dark.css";
+ 
+const PageNumberBadge = ({ children }: { children?: React.ReactNode }) => (
+  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 mx-1 rounded text-[11px] font-mono font-medium bg-zinc-800/90 text-zinc-400 border border-white/[0.08] align-middle">
+    <FileText size={11} className="text-zinc-500" />
+    <span>{children}</span>
+  </span>
+);
 
 const MarkdownContent = memo(function MarkdownContent({ text }: { text: string }) {
   return (
@@ -71,6 +78,9 @@ const MarkdownContent = memo(function MarkdownContent({ text }: { text: string }
               <div className="text-xs leading-relaxed text-zinc-300 italic [&>*]:not-italic">{children}</div>
             </figure>
           ),
+          // @ts-expect-error custom tag from Typhoon OCR prompt
+          page_number: PageNumberBadge,
+          "page-number": PageNumberBadge,
         }}
       >
         {text}
@@ -85,23 +95,49 @@ const CodeGenerator = dynamic(() => import("./CodeGenerator").then(mod => mod.Co
 });
 
 // Banner for a page that failed or came back partial (model got stuck repeating itself)
-function PageNotice({ page }: { page?: OcrPageResult }) {
+function PageNotice({ 
+  page, 
+  onRetry, 
+  isLoading 
+}: { 
+  page?: OcrPageResult; 
+  onRetry?: () => void;
+  isLoading?: boolean;
+}) {
   if (!page || (page.success && !page.truncated)) return null;
   const failed = !page.success;
   return (
     <div
       role="status"
       className={cn(
-        "mb-4 flex items-start gap-2 rounded-md border px-3 py-2 text-xs",
+        "mb-4 flex items-center justify-between gap-3 rounded-md border px-3 py-2 text-xs",
         failed ? "border-red-500/30 bg-red-500/10 text-red-200" : "border-amber-500/30 bg-amber-500/10 text-amber-200"
       )}
     >
-      <AlertTriangle size={13} className="mt-0.5 shrink-0" />
-      <span>
-        {failed
-          ? `Page ${page.page} failed: ${page.error ?? "unknown error"}. Use Retry to re-send it.`
-          : `Page ${page.page} is partial: the model got stuck repeating itself and the text was cut. Use Retry to try again.`}
-      </span>
+      <div className="flex items-start gap-2 min-w-0">
+        <AlertTriangle size={13} className="mt-0.5 shrink-0" />
+        <span>
+          {failed
+            ? `Page ${page.page} failed: ${page.error ?? "unknown error"}. Use Retry to re-send it.`
+            : `Page ${page.page} is partial: the model got stuck repeating itself and the text was cut. Use Retry to try again.`}
+        </span>
+      </div>
+      {onRetry && (
+        <button
+          type="button"
+          onClick={onRetry}
+          disabled={isLoading}
+          className={cn(
+            "shrink-0 flex items-center gap-1.5 px-2.5 py-1 rounded text-[11px] font-medium transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed",
+            failed
+              ? "bg-red-500/20 hover:bg-red-500/30 text-red-200 border border-red-500/40"
+              : "bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-500/40"
+          )}
+        >
+          {isLoading ? <Loader2 size={11} className="animate-spin" /> : <RotateCcw size={11} />}
+          <span>Retry Page {page.page}</span>
+        </button>
+      )}
     </div>
   );
 }
@@ -131,7 +167,7 @@ interface ResponsePanelProps {
   setActiveSlotId: (id: string) => void;
   options: OcrOptions;
   isLoading: boolean;
-  onRetryFailed?: (slotId: string) => void;
+  onRetryFailed?: (slotId: string, pageNumber?: number) => void;
 }
 
 export function ResponsePanel({
@@ -577,7 +613,11 @@ export function ResponsePanel({
                           </span>
                         </div>
                       )}
-                      <PageNotice page={pageResult} />
+                      <PageNotice 
+                        page={pageResult} 
+                        onRetry={activeSlot && onRetryFailed ? () => onRetryFailed(activeSlot.id, pageResult.page) : undefined}
+                        isLoading={activeSlot?.isLoading || isLoading}
+                      />
                       <MarkdownContent text={pageResult.text} />
                     </div>
                   ))}
@@ -690,7 +730,11 @@ export function ResponsePanel({
                   </div>
 
                   <div className="flex-1 overflow-y-auto p-6 scrollbar-thin select-text">
-                    <PageNotice page={currentResultPage} />
+                    <PageNotice 
+                      page={currentResultPage} 
+                      onRetry={activeSlot && onRetryFailed && currentResultPage ? () => onRetryFailed(activeSlot.id, currentResultPage.page) : undefined}
+                      isLoading={activeSlot?.isLoading || isLoading}
+                    />
                     <MarkdownContent text={currentResultPage?.text || ""} />
                   </div>
                 </div>
