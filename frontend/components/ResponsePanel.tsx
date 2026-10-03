@@ -168,6 +168,7 @@ interface ResponsePanelProps {
   options: OcrOptions;
   isLoading: boolean;
   onRetryFailed?: (slotId: string, pageNumber?: number) => void;
+  onCancel?: () => void;
 }
 
 export function ResponsePanel({
@@ -176,7 +177,8 @@ export function ResponsePanel({
   setActiveSlotId,
   options,
   isLoading,
-  onRetryFailed
+  onRetryFailed,
+  onCancel
 }: ResponsePanelProps) {
   const [copiedMode, setCopiedMode] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"combined" | "compare">("compare");
@@ -581,6 +583,16 @@ export function ResponsePanel({
                 />
               </div>
             </div>
+
+            {onCancel && (
+              <button
+                type="button"
+                onClick={onCancel}
+                className="mt-5 px-3.5 py-1.5 rounded-md bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 border border-red-500/20 text-xs font-medium transition-colors cursor-pointer"
+              >
+                ยกเลิกการประมวลผล (Cancel)
+              </button>
+            )}
           </div>
         ) : !result ? (
           /* Clean Empty Studio State */

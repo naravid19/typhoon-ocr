@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Navbar } from "@/components/Navbar";
 import { ConfigPanel } from "@/components/ConfigPanel";
 import { ResponsePanel } from "@/components/ResponsePanel";
@@ -24,6 +24,7 @@ function OcrPageContent() {
   const [activeSlotId, setActiveSlotId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // Notification Context
   const { 
@@ -83,6 +84,13 @@ function OcrPageContent() {
     setActiveSlotId(null);
   }, []);
 
+  const handleCancel = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+  }, []);
+
   const handleSubmit = async () => {
     const pendingSlots = slots.filter((s) => !s.result && !s.isLoading);
     if (pendingSlots.length === 0) return;
@@ -103,9 +111,12 @@ function OcrPageContent() {
       document.getElementById("results-panel")?.scrollIntoView({ behavior: "smooth", block: "start" });
     }
 
+    abortControllerRef.current = new AbortController();
+
     let succeededCount = 0;
     let failedCount = 0;
     let partialCount = 0;
+    let wasCanceled = false;
 
     try {
       await processBatch(
@@ -119,7 +130,9 @@ function OcrPageContent() {
           });
         },
         (id, result, err) => {
-          if (result && !err) {
+          if (err === "Canceled by user" || (err && err.includes("Canceled"))) {
+            wasCanceled = true;
+          } else if (result && !err) {
             succeededCount++;
             if (result.results.some((r) => !r.success || r.truncated)) partialCount++;
           } else {
@@ -131,10 +144,13 @@ function OcrPageContent() {
             error: err,
             statusMessage: null,
           });
-        }
+        },
+        abortControllerRef.current.signal
       );
 
-      if (succeededCount > 0) {
+      if (wasCanceled) {
+        toast.error("การประมวลผลถูกยกเลิก", "ยกเลิกโดยผู้ใช้");
+      } else if (succeededCount > 0) {
         toast.success(
           "ประมวลผลสำเร็จ",
           `ประมวลผลสำเร็จ ${succeededCount} ไฟล์${failedCount > 0 ? ` (${failedCount} ไฟล์ไม่สำเร็จ)` : ""}` +
@@ -147,10 +163,13 @@ function OcrPageContent() {
     } catch (err) {
       const errorMessage =
         err instanceof Error ? err.message : "An error occurred";
-      setError(errorMessage);
-      toast.error("เกิดข้อผิดพลาด", errorMessage);
+      if (errorMessage !== "Canceled by user" && !errorMessage.includes("abort")) {
+        setError(errorMessage);
+        toast.error("เกิดข้อผิดพลาด", errorMessage);
+      }
     } finally {
       setIsLoading(false);
+      abortControllerRef.current = null;
     }
   };
 
@@ -239,6 +258,7 @@ function OcrPageContent() {
             options={options}
             isLoading={isLoading}
             onRetryFailed={handleRetryFailed}
+            onCancel={handleCancel}
           />
         </div>
       </main>

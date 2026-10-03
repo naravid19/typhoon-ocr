@@ -1,4 +1,4 @@
-import { OcrOptions, OcrPageResult, OcrResult } from "@/types/ocr";
+import type { OcrOptions, OcrPageResult, OcrResult } from "@/types/ocr";
 
 export interface OcrProgress {
   type: "start" | "progress" | "page_complete" | "complete" | "error";
@@ -18,7 +18,8 @@ export interface OcrProgress {
 export async function processOcrWithProgress(
   file: File,
   options: OcrOptions,
-  onProgress: (progress: OcrProgress) => void
+  onProgress: (progress: OcrProgress) => void,
+  abortSignal?: AbortSignal
 ): Promise<OcrResult> {
   const formData = new FormData();
   formData.append("file", file);
@@ -40,6 +41,7 @@ export async function processOcrWithProgress(
   const response = await fetch(`${apiUrl}/api/ocr/stream`, {
     method: "POST",
     body: formData,
+    signal: abortSignal,
   });
 
   if (!response.ok) {

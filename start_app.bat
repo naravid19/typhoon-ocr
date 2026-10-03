@@ -24,9 +24,14 @@ REM -------------------------------------------------------------
 echo   [1/4] Checking environment configuration...
 
 if not exist ".env" (
-    echo   [!] Error: .env configuration file not found.
-    echo       Please copy .env.template to .env and configure your API key.
-    goto :error_exit
+    if exist ".env.template" (
+        echo   [..] .env not found. Automatically creating from .env.template...
+        copy .env.template .env >nul
+        echo   [OK] .env file initialized from template.
+    ) else (
+        echo   [!] Error: Neither .env nor .env.template configuration file found.
+        goto :error_exit
+    )
 )
 
 findstr /C:"TYPHOON_API_KEY=" .env >nul
