@@ -94,6 +94,7 @@ This fork provides a modern **Next.js web application** alongside the original G
 - 🔁 **Partial Results & Page Retry**: One failed page no longer discards the file. Failed and truncated pages are flagged and can be re-sent alone with **Retry N pages**
 - 🚦 **Shared Rate Limiter**: Honors Typhoon's documented 2 req/s and 20 req/min across all files, with bounded retries for stuck pages
 - ⚙️ **Dynamic Model Discovery & Limits**: Dynamically discover models (`/api/models`) and adjust `MAX_FILES` directly via the in-app Settings panel
+- 📚 **Ultra-Large Document Support (2,000+ Pages)**: Payload-optimized streaming and client-side vector PDF rendering in Compare View (`react-pdf`) prevent V8 string length crashes (`RangeError: Invalid string length`) and memory bloat on massive books and reports
 - 🔄 **Release-Based Update Check**: Compares the installed version with the latest stable GitHub Release (cached, no API rate limit), shows the release notes, and can fast-forward to that release in one click (`git merge --ff-only`, never unreleased commits)
 
 > **This fork focuses on Windows 10/11.** For macOS/Linux setup, please refer to the official Typhoon OCR repository.

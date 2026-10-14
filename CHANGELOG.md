@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v1.1.4] - 2026-10-14
+
+### Fixed
+- **V8 `RangeError: Invalid string length` on Massive Documents**: Multi-page documents with thousands of pages (e.g. 2,000+ pages) crashed the browser upon stream completion because the backend bundled high-resolution base64 raster images for every single page in the final JSON event (~850 MB – 1 GB payload, exceeding V8's 512 MB string length limit). The backend now omits redundant `image_base64` on multi-page payloads (`len(results) <= 1 ? image_base64 : ""`), shrinking the payload for 2,084 pages down to ~1.16 MB.
+- **Python Backend Memory Overhead**: In `process_ocr_stream`, per-page base64 image memory is now proactively cleared (`page_result.image_base64 = ""`) as each page task finishes, freeing hundreds of megabytes of Python heap memory during large batch OCR runs.
+
+### Added
+- **Client-Side PDF Rendering in Compare View (`PdfPageViewer`)**: Integrated `react-pdf` into the Resizable Compare Workbench to render original document pages on-demand directly from the local file object in vector quality. Eliminates server-to-client raster image transfers while keeping full zoom (Fit vs 100%) and navigation capabilities for multi-thousand page documents.
+
+### Changed
+- **Memory-Safe SSE Stream Processing**: Refactored SSE chunk handling in `frontend/lib/api.ts` to use delimiter-based extraction (`buffer.indexOf("\n\n")`) instead of repeatedly splitting the growing buffer (`buffer.split("\n\n")`), eliminating unnecessary array allocations and garbage collection pressure on large streams.
+
 ## [v1.1.3] - 2026-09-29
 
 ### Added
