@@ -129,6 +129,7 @@ async def process_ocr(
         )
         
         # Convert to response model
+        include_images = len(result.results) <= 1
         return OcrResponse(
             success=result.success,
             results=[
@@ -136,7 +137,7 @@ async def process_ocr(
                     page=r.page,
                     success=r.success,
                     text=r.text,
-                    image_base64=r.image_base64,
+                    image_base64=r.image_base64 if include_images else "",
                     error=r.error,
                     truncated=r.truncated
                 )
@@ -339,21 +340,25 @@ async def process_ocr_stream(
                         continue
                 
                 page_result, page_tokens = task.result()
+                if total_targets > 1:
+                    page_result.image_base64 = ""
                 results.append(page_result)
                 total_tokens += page_tokens
 
                 # Send page complete event
-                yield f"data: {json.dumps({'type': 'page_complete', 'page': page_result.page, 'success': page_result.success, 'text': page_result.text[:200] + '...' if len(page_result.text) > 200 else page_result.text, 'image_base64': page_result.image_base64[:100] if page_result.image_base64 else '', 'error': page_result.error, 'truncated': page_result.truncated})}\n\n"
+                yield f"data: {json.dumps({'type': 'page_complete', 'page': page_result.page, 'success': page_result.success, 'text': page_result.text[:200] + '...' if len(page_result.text) > 200 else page_result.text, 'image_base64': '', 'error': page_result.error, 'truncated': page_result.truncated})}\n\n"
             
             processing_time = round(time.time() - start_time, 2)
             
             # Send complete event with full results
+            # For multi-page documents, omit image_base64 to avoid V8 string limit errors (>512MB in browser)
+            include_images = len(results) <= 1
             final_results = [
                 {
                     'page': r.page,
                     'success': r.success,
                     'text': r.text,
-                    'image_base64': r.image_base64,
+                    'image_base64': r.image_base64 if include_images else '',
                     'error': r.error,
                     'truncated': r.truncated
                 }

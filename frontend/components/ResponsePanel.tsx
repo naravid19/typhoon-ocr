@@ -35,6 +35,16 @@ import {
   downloadMerged,
 } from "@/utils/export";
 import "highlight.js/styles/github-dark.css";
+
+const PdfPageViewerDynamic = dynamic(() => import("./PdfPageViewer"), {
+  ssr: false,
+  loading: () => (
+    <div className="flex flex-col items-center gap-2 text-zinc-500 text-xs font-mono">
+      <Loader2 size={16} className="animate-spin text-violet-400" />
+      <span>Loading Document Page...</span>
+    </div>
+  ),
+});
  
 const PageNumberBadge = ({ children }: { children?: React.ReactNode }) => (
   <span className="inline-flex items-center gap-1 px-1.5 py-0.5 mx-1 rounded text-[11px] font-mono font-medium bg-zinc-800/90 text-zinc-400 border border-white/[0.08] align-middle">
@@ -685,6 +695,24 @@ export function ResponsePanel({
                       <img 
                         src={`data:image/jpeg;base64,${currentResultPage.image_base64}`} 
                         alt={`Page ${currentResultPage.page}`}
+                        className={cn(
+                          "rounded shadow-md transition-all select-none",
+                          zoomMode === "fit" 
+                            ? "max-w-full max-h-full object-contain" 
+                            : "max-w-none cursor-default"
+                        )}
+                      />
+                    ) : activeSlot?.file && (activeSlot.file.type === "application/pdf" || activeSlot.file.name.toLowerCase().endsWith(".pdf")) ? (
+                      <PdfPageViewerDynamic
+                        file={activeSlot.file}
+                        pageNumber={currentResultPage?.page ?? (currentPageIndex + 1)}
+                        zoomMode={zoomMode}
+                      />
+                    ) : activeSlot?.file && activeSlot.file.type.startsWith("image/") ? (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img
+                        src={URL.createObjectURL(activeSlot.file)}
+                        alt={`Page ${currentResultPage?.page ?? 1}`}
                         className={cn(
                           "rounded shadow-md transition-all select-none",
                           zoomMode === "fit" 

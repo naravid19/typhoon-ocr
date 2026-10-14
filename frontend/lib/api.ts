@@ -62,36 +62,52 @@ export async function processOcrWithProgress(
 
     buffer += decoder.decode(value, { stream: true });
 
-    // Split by SSE double newline
-    const lines = buffer.split("\n\n");
-    // Keep the last partial line in the buffer
-    buffer = lines.pop() || "";
+    // Process all completed SSE message blocks
+    let delimiterIndex: number;
+    while ((delimiterIndex = buffer.indexOf("\n\n")) !== -1) {
+      const block = buffer.slice(0, delimiterIndex);
+      buffer = buffer.slice(delimiterIndex + 2);
 
-    for (const line of lines) {
-      if (line.trim() === "" || line.startsWith(":")) continue;
+      const lines = block.split("\n");
+      for (const line of lines) {
+        if (line.trim() === "" || line.startsWith(":")) continue;
 
-      if (line.startsWith("data: ")) {
-        const jsonStr = line.replace("data: ", "").trim();
-        let progress: OcrProgress | null = null;
-        try {
-          progress = JSON.parse(jsonStr) as OcrProgress;
-        } catch (e) {
-          console.error("Failed to parse SSE data", e);
-        }
-
-        if (progress) {
-          onProgress(progress);
-
-          if (progress.type === "complete") {
-            // Re-cast as OcrResult which matches the 'complete' event payload
-            return progress as unknown as OcrResult;
+        if (line.startsWith("data: ")) {
+          const jsonStr = line.replace("data: ", "").trim();
+          let progress: OcrProgress | null = null;
+          try {
+            progress = JSON.parse(jsonStr) as OcrProgress;
+          } catch (e) {
+            console.error("Failed to parse SSE data", e);
           }
 
-          if (progress.type === "error") {
-            throw new Error(progress.message || "Unknown error during OCR streaming");
+          if (progress) {
+            onProgress(progress);
+
+            if (progress.type === "complete") {
+              // Re-cast as OcrResult which matches the 'complete' event payload
+              return progress as unknown as OcrResult;
+            }
+
+            if (progress.type === "error") {
+              throw new Error(progress.message || "Unknown error during OCR streaming");
+            }
           }
         }
       }
+    }
+  }
+
+  // Handle any trailing complete event in buffer after stream closes
+  if (buffer.trim().startsWith("data: ")) {
+    const jsonStr = buffer.replace("data: ", "").trim();
+    try {
+      const progress = JSON.parse(jsonStr) as OcrProgress;
+      if (progress.type === "complete") {
+        return progress as unknown as OcrResult;
+      }
+    } catch {
+      // ignore
     }
   }
 
