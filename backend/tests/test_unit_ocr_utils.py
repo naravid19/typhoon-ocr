@@ -23,6 +23,7 @@ from typhoon_ocr.ocr_utils import (
     is_base64_string,
     ensure_image_in_path,
     get_prompt,
+    prepare_ocr_messages,
 )
 
 
@@ -381,3 +382,30 @@ class TestGetPrompt:
             assert "sample extracted text" in result
             assert "RAW_TEXT_START" in result
             assert "RAW_TEXT_END" in result
+
+
+class TestV2Messages:
+    def test_v2_prompt_is_verbatim(self):
+        p = get_prompt("v2")()
+        assert p.startswith("- Extract layout information from the provided PDF image.")
+        assert "- Final output must be a single JSON object." in p
+
+    def test_v2_image_first_no_anchor(self, tmp_path):
+        img = tmp_path / "a.png"; Image.new("RGB", (800, 400), "white").save(img)
+        with patch("typhoon_ocr.ocr_utils.get_anchor_text_from_image") as anchor:
+            msgs = prepare_ocr_messages(str(img), task_type="v2")
+        content = msgs[0]["content"]
+        assert [c["type"] for c in content] == ["image_url", "text"]
+        anchor.assert_not_called()
+        data = base64.b64decode(content[0]["image_url"]["url"].split(",")[1])
+        assert max(Image.open(io.BytesIO(data)).size) == 1800  # upscaled
+
+    def test_v2_ignores_figure_language(self, tmp_path):
+        img = tmp_path / "a.png"; Image.new("RGB", (800, 400), "white").save(img)
+        prepare_ocr_messages(str(img), task_type="v2", figure_language="French")  # no error
+
+    def test_v15_layout_unchanged(self, tmp_path):
+        img = tmp_path / "a.png"; Image.new("RGB", (800, 400), "white").save(img)
+        msgs = prepare_ocr_messages(str(img), task_type="v1.5")
+        assert [c["type"] for c in msgs[0]["content"]] == ["text", "image_url"]
+

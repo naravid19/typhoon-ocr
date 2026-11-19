@@ -435,6 +435,20 @@ Describe the image's main elements (people, objects, text), note any contextual 
 - Page Numbers: Wrap page numbers in <page_number>...</page_number> (e.g., <page_number>14</page_number>).
 - Checkboxes: Use ☐ for unchecked and ☑ for checked boxes.
     """,
+    "v2": lambda base_text=None, figure_language=None: (
+        "- Extract layout information from the provided PDF image.\n"
+        "- For each layout element, output its bbox, category, and the text content within the bbox.\n"
+        "- Bbox format: [x1, y1, x2, y2].\n"
+        "- Allowed layout categories: ['header', 'title', 'text', 'figure', 'table', 'formula', 'figure_caption', 'table_caption', 'formula_caption', 'figure_footnote', 'table_footnote', 'page_footnote', 'footer'].\n"
+        "- Text extraction and formatting:\n"
+        "  1) For 'figure', the text field must be an empty string.\n"
+        "  2) For 'formula', format text as LaTeX.\n"
+        "  3) For 'table', format text as HTML.\n"
+        "  4) For all other categories (e.g., text, title), format text as Markdown.\n"
+        "- The output text must be exactly the original text from the image, with no translation or rewriting.\n"
+        "- Sort all layout elements in human reading order.\n"
+        "- Final output must be a single JSON object."
+    ),
 }
 
 def get_prompt(prompt_name: str) -> Callable[[str], str]:
@@ -449,9 +463,10 @@ def get_prompt(prompt_name: str) -> Callable[[str], str]:
     - "default": Creates a prompt for extracting text with tables in markdown format.
     - "structure": Creates a prompt for extracting text with tables in HTML format and image analysis.
     - "v1.5": OCR v1.5 prompt that doesn't require anchor text, uses clean Markdown with HTML tables and Thai figure descriptions.
+    - "v2": OCR v2 prompt for layout JSON extraction.
     
     Args:
-        prompt_name (str): The identifier for the desired prompt template ("default", "structure", or "v1.5").
+        prompt_name (str): The identifier for the desired prompt template ("default", "structure", "v1.5", or "v2").
         
     Returns:
         Callable[[str], str]: A function that takes extracted text and returns a formatted prompt.
@@ -531,7 +546,8 @@ def prepare_ocr_messages(
         pdf_or_image_path (str): Path to a PDF or image file to process
         task_type (str): Type of OCR task - "default" for standard markdown extraction,
                          "structure" for enhanced layout analysis with HTML tables,
-                         "v1.5" for OCR v1.5 with clean Markdown and Thai figure descriptions
+                         "v1.5" for OCR v1.5 with clean Markdown and Thai figure descriptions,
+                         "v2" for OCR v2 layout JSON extraction
         target_image_dim (int): Target longest dimension for the rendered image in pixels
         target_text_length (int): Maximum length of extracted text to include (not used for v1.5)
         page_num (int): Page number to process (default=1, for images always 1)
@@ -569,13 +585,13 @@ def prepare_ocr_messages(
         if is_image:
             page_num = 1
             img = Image.open(pdf_or_image_path)
-            # For v1.5, use different resize logic
-            if task_type == "v1.5":
+            # For v1.5 and v2, use different resize logic
+            if task_type in ("v1.5", "v2"):
                 img = resize_if_needed(img, max_size=target_image_dim)
             # Render the image to base64 PNG
             image_base64 = image_to_base64png(img)
-            # Get anchor text from the image (not needed for v1.5)
-            if task_type != "v1.5":
+            # Get anchor text from the image (not needed for v1.5 or v2)
+            if task_type not in ("v1.5", "v2"):
                 anchor_text = get_anchor_text_from_image(img)
         else:
             if page_num < 1:
@@ -586,8 +602,8 @@ def prepare_ocr_messages(
             image_base64 = render_pdf_to_base64png(
                 filename, page_num, target_longest_image_dim=target_image_dim
             )
-            # Extract anchor text from the selected PDF page (not needed for v1.5)
-            if task_type != "v1.5":
+            # Extract anchor text from the selected PDF page (not needed for v1.5 or v2)
+            if task_type not in ("v1.5", "v2"):
                 anchor_text = get_anchor_text(
                     filename,
                     page_num,
@@ -601,20 +617,24 @@ def prepare_ocr_messages(
         
         # Apply the prompt template to the extracted anchor text
         # For v1.5, no anchor text is needed but figure_language is passed
+        # For v2, no anchor text is needed
         if task_type == "v1.5":
             assert figure_language in ["Thai", "English"], "figure_language must be 'Thai' or 'English' for v1.5"
             prompt_text = prompt_fn(figure_language=figure_language)
+        elif task_type == "v2":
+            prompt_text = prompt_fn()
         else:
             prompt_text = prompt_fn(anchor_text)
         
         # Create messages structure
+        image_part = {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{image_base64}"}}
+        text_part = {"type": "text", "text": prompt_text}
+        content = [image_part, text_part] if task_type == "v2" else [text_part, image_part]
+
         messages = [
             {
                 "role": "user",
-                "content": [
-                    {"type": "text", "text": prompt_text},
-                    {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{image_base64}"}},
-                ],
+                "content": content,
             }
         ]
         
