@@ -55,7 +55,7 @@ class ModelInfo(BaseModel):
 async def process_ocr(
     file: UploadFile = File(..., description="Image or PDF file to process"),
     model: str = Form(default="typhoon-ocr", description="Model to use"),
-    task_type: str = Form(default="v1.5", description="Task type: v1.5 (default), default, or structure"),
+    task_type: str = Form(default="v1.5", description="Task type: v1.5 (default), v2, default, or structure"),
     max_tokens: int = Form(default=16384, description="Maximum tokens"),
     temperature: float = Form(default=0.1, description="Temperature (0.0-1.0)"),
     top_p: float = Form(default=0.6, description="Top P (0.0-1.0)"),
@@ -68,7 +68,7 @@ async def process_ocr(
     
     - **file**: PDF or image file (JPEG, PNG)
     - **model**: Model name (default: typhoon-ocr)
-    - **task_type**: 'default', 'structure', or 'v1.5'
+    - **task_type**: 'default', 'structure', 'v1.5', or 'v2'
     - **max_tokens**: Maximum tokens for response
     - **temperature**: Sampling temperature
     - **top_p**: Top-p sampling
@@ -212,7 +212,7 @@ async def get_page_count(
 async def process_ocr_stream(
     file: UploadFile = File(..., description="Image or PDF file to process"),
     model: str = Form(default="typhoon-ocr", description="Model to use"),
-    task_type: str = Form(default="v1.5", description="Task type: v1.5 (default), default, or structure"),
+    task_type: str = Form(default="v1.5", description="Task type: v1.5 (default), v2, default, or structure"),
     max_tokens: int = Form(default=16384, description="Maximum tokens"),
     temperature: float = Form(default=0.1, description="Temperature (0.0-1.0)"),
     top_p: float = Form(default=0.6, description="Top P (0.0-1.0)"),

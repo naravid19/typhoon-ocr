@@ -279,13 +279,19 @@ class TyphoonOCRService:
     def _resolve_model_and_task_type(self, model: Optional[str], task_type: Optional[str]) -> Tuple[str, str]:
         """Resolve model name and ensure compatible task_type."""
         resolved_model = self._resolve_model_name(model)
+        model_lower = resolved_model.lower()
+
+        # A model id is V2 when its lowercase form contains ocr-v2 or ocr2
+        if "ocr-v2" in model_lower or "ocr2" in model_lower:
+            return resolved_model, "v2"
+
         normalized_task = (task_type or "v1.5").strip()
 
         # If model is explicitly a legacy preview model, enforce default or structure
-        if "typhoon-ocr-preview" in resolved_model.lower():
+        if "typhoon-ocr-preview" in model_lower:
             if normalized_task not in ["default", "structure"]:
                 normalized_task = "structure"
-        elif "typhoon-ocr" in resolved_model.lower() or normalized_task not in ["default", "structure"]:
+        elif "typhoon-ocr" in model_lower or normalized_task not in ["default", "structure"]:
             # Typhoon OCR 1.5 is a single-prompt model; force v1.5 to prevent legacy anchor text prompting
             normalized_task = "v1.5"
 
@@ -295,8 +301,13 @@ class TyphoonOCRService:
     def _extract_image_base64(messages: List[dict]) -> str:
         """Extract preview image (base64) from prepared OCR messages."""
         try:
-            img_url = messages[0]["content"][1]["image_url"]["url"]
-            return img_url.split(",")[-1] if "," in img_url else ""
+            content = messages[0]["content"]
+            if isinstance(content, list):
+                for part in content:
+                    if isinstance(part, dict) and part.get("type") == "image_url":
+                        img_url = part.get("image_url", {}).get("url", "")
+                        return img_url.split(",")[-1] if "," in img_url else ""
+            return ""
         except Exception:
             return ""
 
@@ -305,6 +316,7 @@ class TyphoonOCRService:
         """
         Parse model output into final text.
         For v1.5, Typhoon OCR outputs clean Markdown directly (preserving <table> and <figure>).
+        For v2, Typhoon OCR outputs layout JSON (bbox/category/text) converted to Markdown.
         For legacy v1 models, natural_text is extracted from JSON or code fences.
         """
         if content is None:
@@ -317,6 +329,62 @@ class TyphoonOCRService:
         # For v1.5, return clean markdown directly without stripping figure tags
         if task_type == "v1.5":
             return raw_content
+
+        if task_type == "v2":
+            candidate = None
+            if "```" in raw_content:
+                parts = raw_content.split("```")
+                if len(parts) >= 2:
+                    fence_body = parts[1]
+                    if fence_body.lower().startswith("json"):
+                        fence_body = fence_body[4:]
+                    candidate = fence_body.strip()
+
+            if candidate is None:
+                bracket_idx = raw_content.find("[")
+                if bracket_idx != -1:
+                    candidate = raw_content[bracket_idx:].strip()
+
+            if not candidate:
+                return raw_content
+
+            bracket_idx = candidate.find("[")
+            if bracket_idx != -1:
+                candidate = candidate[bracket_idx:]
+            else:
+                return raw_content
+
+            data = None
+            try:
+                data = json.loads(candidate)
+            except (json.JSONDecodeError, TypeError):
+                last_brace = candidate.rfind("}")
+                if last_brace != -1:
+                    truncated = candidate[:last_brace + 1].rstrip()
+                    if truncated.endswith(","):
+                        truncated = truncated[:-1].rstrip()
+                    truncated += "]"
+                    try:
+                        data = json.loads(truncated)
+                    except (json.JSONDecodeError, TypeError):
+                        data = None
+
+            if not isinstance(data, list):
+                return raw_content
+
+            excluded_categories = {"header", "footer", "page_footnote"}
+            kept_texts = []
+            for item in data:
+                if not isinstance(item, dict):
+                    continue
+                category = item.get("category")
+                if category in excluded_categories:
+                    continue
+                text = item.get("text")
+                if isinstance(text, str) and text:
+                    kept_texts.append(text)
+
+            return "\n\n".join(kept_texts)
 
         def _extract_from_json(candidate: str) -> Optional[str]:
             try:
@@ -359,10 +427,18 @@ class TyphoonOCRService:
         """
         resolved_model, task_type = self._resolve_model_and_task_type(model, task_type)
         _max_tokens = max_tokens or self.config.MAX_TOKENS
-        _temperature = temperature if temperature is not None else self.config.TEMPERATURE
+        if temperature is not None:
+            _temperature = temperature
+        elif task_type == "v2":
+            _temperature = 0
+        else:
+            _temperature = self.config.TEMPERATURE
+
         _top_p = top_p if top_p is not None else self.config.TOP_P
         if repetition_penalty is not None:
             _repetition_penalty = repetition_penalty
+        elif task_type == "v2":
+            _repetition_penalty = 1.0
         elif task_type == "v1.5":
             _repetition_penalty = 1.1
         else:
@@ -397,17 +473,21 @@ class TyphoonOCRService:
             # Small first pass: a page the model loops on then ends in ~30s instead of stalling to the 180s server timeout
             call_max_tokens = min(_max_tokens, self.config.FIRST_PASS_MAX_TOKENS)
             for attempt in range(2):
+                extra_body = {
+                    "repetition_penalty": _repetition_penalty,
+                    "temperature": _temperature,
+                    "top_p": _top_p
+                }
+                if task_type == "v2":
+                    extra_body["chat_template_kwargs"] = {"enable_thinking": False}
+
                 response = await self._call_api_with_retry(
                     self.client.chat.completions.create,
                     log_ctx=ctx,
                     model=resolved_model,
                     messages=messages,
                     max_tokens=call_max_tokens,
-                    extra_body={
-                        "repetition_penalty": _repetition_penalty,
-                        "temperature": _temperature,
-                        "top_p": _top_p
-                    }
+                    extra_body=extra_body,
                 )
 
                 if hasattr(response, "usage") and response.usage and getattr(response.usage, "total_tokens", None):
@@ -542,3 +622,6 @@ def reset_service() -> None:
     """Reset the OCR service singleton so it reloads config on next access."""
     global _service_instance
     _service_instance = None
+
+
+OcrService = TyphoonOCRService
