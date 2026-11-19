@@ -18,6 +18,7 @@ import {
   Plus
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { modelDefaults } from "@/lib/modelDefaults";
 import { OcrOptions, FileSlot } from "@/types/ocr";
 import { SettingsModal } from "./SettingsModal";
 
@@ -96,6 +97,11 @@ export function ConfigPanel({
       description: "Recommended: Single-prompt Markdown with Thai/English figure descriptions",
     },
     {
+      id: "typhoon-ocr-v2",
+      name: "Typhoon OCR V2 (2B)",
+      description: "Newest: layout-aware Markdown, highest Thai accuracy; no figure descriptions",
+    },
+    {
       id: "typhoon-ocr-preview",
       name: "Typhoon OCR 1 (7B)",
       description: "Legacy model: Requires anchor text and supports default / structure modes",
@@ -120,12 +126,10 @@ export function ConfigPanel({
           const envModel = data.TYPHOON_OCR_MODEL.trim();
           setOptions((prev) => {
             if (!prev.model || prev.model === "typhoon-ocr") {
-              const isPreview = envModel.toLowerCase().includes("preview");
               return {
                 ...prev,
                 model: envModel,
-                task_type: isPreview ? "structure" : "v1.5",
-                repetition_penalty: isPreview ? 1.2 : 1.1,
+                ...modelDefaults(envModel, prev.task_type),
               };
             }
             return prev;
@@ -206,12 +210,10 @@ export function ConfigPanel({
   };
 
   const handleModelSelect = (selectedModelId: string) => {
-    const isLegacy = selectedModelId.toLowerCase().includes("preview");
     setOptions((prev) => ({
       ...prev,
       model: selectedModelId,
-      task_type: isLegacy ? (prev.task_type === "v1.5" ? "structure" : prev.task_type) : "v1.5",
-      repetition_penalty: isLegacy ? 1.2 : 1.1,
+      ...modelDefaults(selectedModelId, prev.task_type),
     }));
   };
 
@@ -481,70 +483,72 @@ export function ConfigPanel({
         </div>
 
         {/* Section 2: Pipeline Configuration */}
-        <div className="space-y-3 pt-3 border-t border-white/[0.08]">
-          <span className="text-[11px] font-mono uppercase tracking-wider text-zinc-400">
-            Pipeline Configuration
-          </span>
+        {options.task_type !== "v2" && (
+          <div className="space-y-3 pt-3 border-t border-white/[0.08]">
+            <span className="text-[11px] font-mono uppercase tracking-wider text-zinc-400">
+              Pipeline Configuration
+            </span>
 
-          {isLegacy ? (
-            <div className="space-y-2">
-              <label className="text-xs text-zinc-300">Task Type (v1 Legacy)</label>
-              <div className="grid grid-cols-2 gap-1 p-1 bg-zinc-900 border border-zinc-800 rounded-md">
-                <button 
-                  onClick={() => handleTaskTypeChange("default")}
-                  className={cn(
-                    "py-1.5 text-xs font-medium rounded transition-all",
-                    options.task_type === "default" ? "bg-zinc-800 text-white" : "text-zinc-500 hover:text-zinc-300"
-                  )}
-                >
-                  Default
-                </button>
-                <button 
-                  onClick={() => handleTaskTypeChange("structure")}
-                  className={cn(
-                    "py-1.5 text-xs font-medium rounded transition-all",
-                    options.task_type === "structure" ? "bg-zinc-800 text-white" : "text-zinc-500 hover:text-zinc-300"
-                  )}
-                >
-                  Structure
-                </button>
+            {isLegacy ? (
+              <div className="space-y-2">
+                <label className="text-xs text-zinc-300">Task Type (v1 Legacy)</label>
+                <div className="grid grid-cols-2 gap-1 p-1 bg-zinc-900 border border-zinc-800 rounded-md">
+                  <button 
+                    onClick={() => handleTaskTypeChange("default")}
+                    className={cn(
+                      "py-1.5 text-xs font-medium rounded transition-all",
+                      options.task_type === "default" ? "bg-zinc-800 text-white" : "text-zinc-500 hover:text-zinc-300"
+                    )}
+                  >
+                    Default
+                  </button>
+                  <button 
+                    onClick={() => handleTaskTypeChange("structure")}
+                    className={cn(
+                      "py-1.5 text-xs font-medium rounded transition-all",
+                      options.task_type === "structure" ? "bg-zinc-800 text-white" : "text-zinc-500 hover:text-zinc-300"
+                    )}
+                  >
+                    Structure
+                  </button>
+                </div>
               </div>
-            </div>
-          ) : (
-            <div className="space-y-2.5">
-              <div className="flex items-center justify-between">
-                <label className="text-xs text-zinc-300 font-medium">Figure Description Language</label>
-                <span className="text-[10px] font-mono text-zinc-500">&lt;figure&gt;</span>
+            ) : (
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs text-zinc-300 font-medium">Figure Description Language</label>
+                  <span className="text-[10px] font-mono text-zinc-500">&lt;figure&gt;</span>
+                </div>
+                <div className="grid grid-cols-2 gap-1 p-1 bg-zinc-900 border border-zinc-800 rounded-md">
+                  <button
+                    type="button"
+                    onClick={() => handleChange("figure_language", "Thai")}
+                    className={cn(
+                      "py-1.5 text-xs font-medium rounded transition-all",
+                      (options.figure_language || "Thai") === "Thai"
+                        ? "bg-zinc-800 text-white shadow-xs"
+                        : "text-zinc-500 hover:text-zinc-300"
+                    )}
+                  >
+                    ภาษาไทย (Thai)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleChange("figure_language", "English")}
+                    className={cn(
+                      "py-1.5 text-xs font-medium rounded transition-all",
+                      options.figure_language === "English"
+                        ? "bg-zinc-800 text-white shadow-xs"
+                        : "text-zinc-500 hover:text-zinc-300"
+                    )}
+                  >
+                    English
+                  </button>
+                </div>
               </div>
-              <div className="grid grid-cols-2 gap-1 p-1 bg-zinc-900 border border-zinc-800 rounded-md">
-                <button
-                  type="button"
-                  onClick={() => handleChange("figure_language", "Thai")}
-                  className={cn(
-                    "py-1.5 text-xs font-medium rounded transition-all",
-                    (options.figure_language || "Thai") === "Thai"
-                      ? "bg-zinc-800 text-white shadow-xs"
-                      : "text-zinc-500 hover:text-zinc-300"
-                  )}
-                >
-                  ภาษาไทย (Thai)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleChange("figure_language", "English")}
-                  className={cn(
-                    "py-1.5 text-xs font-medium rounded transition-all",
-                    options.figure_language === "English"
-                      ? "bg-zinc-800 text-white shadow-xs"
-                      : "text-zinc-500 hover:text-zinc-300"
-                  )}
-                >
-                  English
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+        )}
 
         {/* Section 2b: Multi-file run mode */}
         {slots.length > 1 && (

@@ -1,4 +1,4 @@
-export type OcrTaskType = "default" | "structure" | "v1.5";
+export type OcrTaskType = "default" | "structure" | "v1.5" | "v2";
 export type FigureLanguage = "Thai" | "English";
 // sequential: one file at a time (each finishes sooner); parallel: several files share the API quota
 export type FileMode = "sequential" | "parallel";
