@@ -167,6 +167,11 @@ async def list_models():
             description="Latest & Recommended: Single-prompt layout-aware Markdown with Thai/English figure descriptions"
         ),
         ModelInfo(
+            id="typhoon-ocr-v2",
+            name="Typhoon OCR V2 (2B)",
+            description="Newest: layout-aware Markdown, highest Thai accuracy; no figure descriptions"
+        ),
+        ModelInfo(
             id="typhoon-ocr-preview",
             name="Typhoon OCR 1 (7B)",
             description="Legacy model: Requires anchor text and supports default / structure modes"

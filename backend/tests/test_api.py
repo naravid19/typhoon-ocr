@@ -34,7 +34,8 @@ def test_list_models():
     models = response.json()
     assert isinstance(models, list)
     assert len(models) > 0
-    assert models[0]["id"] == "typhoon-ocr"
+    assert [m["id"] for m in models[:3]] == ["typhoon-ocr", "typhoon-ocr-v2", "typhoon-ocr-preview"]
+    assert models[1]["name"] == "Typhoon OCR V2 (2B)"
 
 @patch("routes.ocr.get_ocr_service")
 def test_ocr_endpoint_mock(mock_get_service):
