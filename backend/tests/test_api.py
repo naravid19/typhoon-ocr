@@ -119,3 +119,25 @@ def test_ocr_endpoint_accepts_v15_task_type(mock_get_service):
     called_kwargs = mock_service_instance.process_document.call_args.kwargs
     assert called_kwargs["task_type"] == "v1.5"
     assert called_kwargs["model"] == "typhoon-ocr"
+
+
+@patch("routes.ocr.get_ocr_service")
+def test_ocr_endpoint_omitted_temperature_is_none(mock_get_service):
+    """No temperature in the form must reach the service as None so v2 can default to 0."""
+    from services.ocr_service import OcrResult
+
+    mock_service_instance = MagicMock()
+    mock_service_instance.process_document = AsyncMock(return_value=OcrResult(
+        success=True, results=[], total_tokens=0, processing_time=0.1, error=None))
+    mock_get_service.return_value = mock_service_instance
+
+    files = {'file': ('test.pdf', b'dummy content', 'application/pdf')}
+    temp_dir = _make_workspace_tmp_dir()
+    try:
+        with patch("routes.ocr.tempfile.mkdtemp", return_value=temp_dir):
+            response = client.post("/api/ocr", files=files, data={'model': 'typhoon-ocr-v2', 'task_type': 'v2'})
+    finally:
+        shutil.rmtree(temp_dir, ignore_errors=True)
+
+    assert response.status_code == 200, f"Response: {response.text}"
+    assert mock_service_instance.process_document.call_args.kwargs["temperature"] is None

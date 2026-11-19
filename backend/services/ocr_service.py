@@ -467,7 +467,8 @@ class TyphoonOCRService:
                          len(image_base64) // 1024)
 
             cache_file = self._cache_path(image_base64, resolved_model, task_type, _max_tokens, _temperature,
-                                          _top_p, _repetition_penalty, figure_language)
+                                          _top_p, _repetition_penalty,
+                                          figure_language if task_type == "v1.5" else None)  # only v1.5 prompt uses it
             cached = self._cache_read(cache_file)
             if cached is not None:
                 logger.info("%s cache hit, no API call", ctx)

@@ -137,3 +137,24 @@ def test_parse_v2_truncated_with_braces_in_text():
 
 def test_parse_v2_empty_list():
     assert TyphoonOCRService._parse_response_text("```json\n[]\n```", "v2") == ""
+
+
+def test_v2_cache_key_ignores_figure_language(tmp_path):
+    """V2 has no <figure> output, so figure_language must not split its cache."""
+    import asyncio
+    cache_svc = TyphoonOCRService(Config(API_KEY="x", CACHE_DIR=str(tmp_path / "cache")))
+    resp = MagicMock()
+    resp.choices = [MagicMock()]
+    resp.choices[0].message.content = SAMPLE_V2_RESPONSE
+    resp.choices[0].finish_reason = "stop"
+    resp.usage = None
+    msgs = [{"role": "user", "content": [
+        {"type": "image_url", "image_url": {"url": "data:image/png;base64,QUJD"}},
+        {"type": "text", "text": "prompt"}]}]
+
+    with patch.object(cache_svc, "_call_api_with_retry", new_callable=AsyncMock, return_value=resp) as mock_call, \
+         patch("services.ocr_service.prepare_ocr_messages", return_value=msgs):
+        for lang in ("Thai", "English"):
+            asyncio.run(cache_svc.process_single_page(str(tmp_path / "d.png"), 1, task_type="v2",
+                                                      model="typhoon-ocr-v2", figure_language=lang))
+    assert mock_call.call_count == 1
