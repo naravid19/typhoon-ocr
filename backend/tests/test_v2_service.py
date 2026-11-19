@@ -10,35 +10,77 @@ sys.path.insert(0, str(backend_path))
 from services.ocr_service import Config, OcrService
 
 svc = OcrService(Config(API_KEY="x", CACHE_DIR=None))
-F = '```json\n[{"bbox":[0,0,1,1],"category":"header","text":"H"},' \
-    '{"bbox":[0,0,1,1],"category":"title","text":"# T"},' \
-    '{"bbox":[0,0,1,1],"category":"figure","text":""},' \
+SAMPLE_V2_RESPONSE = (
+    '```json\n[{"bbox":[0,0,1,1],"category":"header","text":"H"},'
+    '{"bbox":[0,0,1,1],"category":"title","text":"# T"},'
+    '{"bbox":[0,0,1,1],"category":"figure","text":""},'
     '{"bbox":[0,0,1,1],"category":"table","text":"<table></table>"}]\n```'
+)
+
 
 @pytest.mark.parametrize("model,task,expected", [
-    ("typhoon-ocr-v2", "v1.5", "v2"), ("typhoon-ocr2", None, "v2"), ("Typhoon-OCR2-0.8b", "structure", "v2"),
-    ("typhoon-ocr", "v2", "v1.5"), ("typhoon-ocr-preview", "default", "default"), ("typhoon-ocr-preview", "v2", "structure"),
+    ("typhoon-ocr-v2", "v1.5", "v2"),
+    ("typhoon-ocr2", None, "v2"),
+    ("Typhoon-OCR2-0.8b", "structure", "v2"),
+    ("typhoon-ocr", "v2", "v1.5"),
+    ("typhoon-ocr-preview", "default", "default"),
+    ("typhoon-ocr-preview", "v2", "structure"),
 ])
-def test_resolve(model, task, expected): assert svc._resolve_model_and_task_type(model, task)[1] == expected
+def test_resolve(model, task, expected):
+    """Test model id to task type resolution."""
+    assert svc._resolve_model_and_task_type(model, task)[1] == expected
 
-def test_parse_v2_fenced(): assert OcrService._parse_response_text(F, "v2") == "# T\n\n<table></table>"
-def test_parse_v2_unfenced(): assert OcrService._parse_response_text("Here:\n" + F.strip("`json\n"), "v2") == "# T\n\n<table></table>"
+
+def test_parse_v2_fenced():
+    """Test parsing fenced V2 JSON response."""
+    assert OcrService._parse_response_text(SAMPLE_V2_RESPONSE, "v2") == "# T\n\n<table></table>"
+
+
+def test_parse_v2_unfenced():
+    """Test parsing unfenced V2 JSON response with preceding text."""
+    payload = "Here:\n" + SAMPLE_V2_RESPONSE.strip("`json\n")
+    assert OcrService._parse_response_text(payload, "v2") == "# T\n\n<table></table>"
+
+
 def test_parse_v2_truncated():
+    """Test recovering partial V2 response truncated at token limit."""
     cut = '```json\n[{"category":"text","text":"a"},{"category":"text","text":"b"},{"category":"text","te'
     assert OcrService._parse_response_text(cut, "v2") == "a\n\nb"
+
+
 def test_parse_v2_bad_elements():
-    assert OcrService._parse_response_text('[1, {"category":"text","text":null}, {"category":"text","text":"ok"}]', "v2") == "ok"
-def test_parse_v2_garbage_returns_raw(): assert OcrService._parse_response_text("plain words", "v2") == "plain words"
+    """Test gracefully skipping invalid elements and null text."""
+    payload = '[1, {"category":"text","text":null}, {"category":"text","text":"ok"}]'
+    assert OcrService._parse_response_text(payload, "v2") == "ok"
+
+
+def test_parse_v2_garbage_returns_raw():
+    """Test that non-JSON garbage returns original raw text."""
+    assert OcrService._parse_response_text("plain words", "v2") == "plain words"
+
+
+def test_parse_v2_with_embedded_code_fences():
+    """Test that embedded triple backticks inside element text do not break parsing."""
+    payload = '```json\n[{"category":"text","text":"Code:\\n```python\\nprint(1)\\n```"}]\n```'
+    assert OcrService._parse_response_text(payload, "v2") == "Code:\n```python\nprint(1)\n```"
+
+
 def test_extract_image_any_order():
-    msgs = [{"content": [{"type": "image_url", "image_url": {"url": "data:image/png;base64,QUJD"}}, {"type": "text", "text": "p"}]}]
+    """Test extracting image base64 regardless of content part order."""
+    msgs = [{"content": [
+        {"type": "image_url", "image_url": {"url": "data:image/png;base64,QUJD"}},
+        {"type": "text", "text": "p"}
+    ]}]
     assert OcrService._extract_image_base64(msgs) == "QUJD"
+
 
 @pytest.mark.asyncio
 async def test_process_single_page_v2(tmp_path):
+    """Test process_single_page uses V2 defaults and template kwargs."""
     test_svc = OcrService(Config(API_KEY="x", CACHE_DIR=None))
     mock_response = MagicMock()
     mock_choice = MagicMock()
-    mock_choice.message.content = F
+    mock_choice.message.content = SAMPLE_V2_RESPONSE
     mock_choice.finish_reason = "stop"
     mock_response.choices = [mock_choice]
     mock_response.usage = None

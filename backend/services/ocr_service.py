@@ -333,12 +333,15 @@ class TyphoonOCRService:
         if task_type == "v2":
             candidate = None
             if "```" in raw_content:
-                parts = raw_content.split("```")
-                if len(parts) >= 2:
-                    fence_body = parts[1]
-                    if fence_body.lower().startswith("json"):
-                        fence_body = fence_body[4:]
-                    candidate = fence_body.strip()
+                first_fence = raw_content.find("```")
+                last_fence = raw_content.rfind("```")
+                if last_fence > first_fence:
+                    fence_body = raw_content[first_fence + 3 : last_fence]
+                else:
+                    fence_body = raw_content[first_fence + 3 :]
+                if fence_body.lower().startswith("json"):
+                    fence_body = fence_body[4:]
+                candidate = fence_body.strip()
 
             if candidate is None:
                 bracket_idx = raw_content.find("[")

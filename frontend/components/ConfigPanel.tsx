@@ -210,11 +210,18 @@ export function ConfigPanel({
   };
 
   const handleModelSelect = (selectedModelId: string) => {
-    setOptions((prev) => ({
-      ...prev,
-      model: selectedModelId,
-      ...modelDefaults(selectedModelId, prev.task_type),
-    }));
+    setOptions((prev) => {
+      const nextDefaults = modelDefaults(selectedModelId, prev.task_type);
+      const isSwitchingAwayFromV2 = prev.task_type === "v2" && nextDefaults.task_type !== "v2";
+      return {
+        ...prev,
+        model: selectedModelId,
+        ...nextDefaults,
+        temperature: nextDefaults.temperature !== undefined
+          ? nextDefaults.temperature
+          : (isSwitchingAwayFromV2 ? 0.1 : prev.temperature),
+      };
+    });
   };
 
   const handleTaskTypeChange = (taskType: OcrOptions["task_type"]) => {
