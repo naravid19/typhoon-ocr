@@ -7,9 +7,9 @@ import pytest
 backend_path = Path(__file__).parent.parent
 sys.path.insert(0, str(backend_path))
 
-from services.ocr_service import Config, OcrService
+from services.ocr_service import Config, TyphoonOCRService
 
-svc = OcrService(Config(API_KEY="x", CACHE_DIR=None))
+svc = TyphoonOCRService(Config(API_KEY="x", CACHE_DIR=None))
 SAMPLE_V2_RESPONSE = (
     '```json\n[{"bbox":[0,0,1,1],"category":"header","text":"H"},'
     '{"bbox":[0,0,1,1],"category":"title","text":"# T"},'
@@ -33,36 +33,36 @@ def test_resolve(model, task, expected):
 
 def test_parse_v2_fenced():
     """Test parsing fenced V2 JSON response."""
-    assert OcrService._parse_response_text(SAMPLE_V2_RESPONSE, "v2") == "# T\n\n<table></table>"
+    assert TyphoonOCRService._parse_response_text(SAMPLE_V2_RESPONSE, "v2") == "# T\n\n<table></table>"
 
 
 def test_parse_v2_unfenced():
     """Test parsing unfenced V2 JSON response with preceding text."""
     payload = "Here:\n" + SAMPLE_V2_RESPONSE.strip("`json\n")
-    assert OcrService._parse_response_text(payload, "v2") == "# T\n\n<table></table>"
+    assert TyphoonOCRService._parse_response_text(payload, "v2") == "# T\n\n<table></table>"
 
 
 def test_parse_v2_truncated():
     """Test recovering partial V2 response truncated at token limit."""
     cut = '```json\n[{"category":"text","text":"a"},{"category":"text","text":"b"},{"category":"text","te'
-    assert OcrService._parse_response_text(cut, "v2") == "a\n\nb"
+    assert TyphoonOCRService._parse_response_text(cut, "v2") == "a\n\nb"
 
 
 def test_parse_v2_bad_elements():
     """Test gracefully skipping invalid elements and null text."""
     payload = '[1, {"category":"text","text":null}, {"category":"text","text":"ok"}]'
-    assert OcrService._parse_response_text(payload, "v2") == "ok"
+    assert TyphoonOCRService._parse_response_text(payload, "v2") == "ok"
 
 
 def test_parse_v2_garbage_returns_raw():
     """Test that non-JSON garbage returns original raw text."""
-    assert OcrService._parse_response_text("plain words", "v2") == "plain words"
+    assert TyphoonOCRService._parse_response_text("plain words", "v2") == "plain words"
 
 
 def test_parse_v2_with_embedded_code_fences():
     """Test that embedded triple backticks inside element text do not break parsing."""
     payload = '```json\n[{"category":"text","text":"Code:\\n```python\\nprint(1)\\n```"}]\n```'
-    assert OcrService._parse_response_text(payload, "v2") == "Code:\n```python\nprint(1)\n```"
+    assert TyphoonOCRService._parse_response_text(payload, "v2") == "Code:\n```python\nprint(1)\n```"
 
 
 def test_extract_image_any_order():
@@ -71,13 +71,13 @@ def test_extract_image_any_order():
         {"type": "image_url", "image_url": {"url": "data:image/png;base64,QUJD"}},
         {"type": "text", "text": "p"}
     ]}]
-    assert OcrService._extract_image_base64(msgs) == "QUJD"
+    assert TyphoonOCRService._extract_image_base64(msgs) == "QUJD"
 
 
 @pytest.mark.asyncio
 async def test_process_single_page_v2(tmp_path):
     """Test process_single_page uses V2 defaults and template kwargs."""
-    test_svc = OcrService(Config(API_KEY="x", CACHE_DIR=None))
+    test_svc = TyphoonOCRService(Config(API_KEY="x", CACHE_DIR=None))
     mock_response = MagicMock()
     mock_choice = MagicMock()
     mock_choice.message.content = SAMPLE_V2_RESPONSE
@@ -127,3 +127,13 @@ async def test_process_single_page_v2(tmp_path):
         assert mock_call.call_count == 1
         call_kwargs = mock_call.call_args.kwargs
         assert "chat_template_kwargs" not in call_kwargs["extra_body"]
+
+
+def test_parse_v2_truncated_with_braces_in_text():
+    """Truncation inside a LaTeX formula must keep the earlier elements."""
+    cut = '[{"category":"text","text":"a"},{"category":"formula","text":"\\frac{1}{2'
+    assert TyphoonOCRService._parse_response_text(cut, "v2") == "a"
+
+
+def test_parse_v2_empty_list():
+    assert TyphoonOCRService._parse_response_text("```json\n[]\n```", "v2") == ""

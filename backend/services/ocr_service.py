@@ -357,22 +357,23 @@ class TyphoonOCRService:
             else:
                 return raw_content
 
-            data = None
-            try:
-                data = json.loads(candidate)
-            except (json.JSONDecodeError, TypeError):
-                last_brace = candidate.rfind("}")
-                if last_brace != -1:
-                    truncated = candidate[:last_brace + 1].rstrip()
-                    if truncated.endswith(","):
-                        truncated = truncated[:-1].rstrip()
-                    truncated += "]"
-                    try:
-                        data = json.loads(truncated)
-                    except (json.JSONDecodeError, TypeError):
-                        data = None
+            # Decode element by element so a reply cut at max_tokens keeps every complete element
+            # (a brace-scan breaks on LaTeX like \frac{1}{2} inside strings).
+            decoder = json.JSONDecoder()
+            data, idx, closed = [], 1, False
+            while idx < len(candidate):
+                while idx < len(candidate) and candidate[idx] in " \t\r\n,":
+                    idx += 1
+                if idx < len(candidate) and candidate[idx] == "]":
+                    closed = True
+                    break
+                try:
+                    item, idx = decoder.raw_decode(candidate, idx)
+                except json.JSONDecodeError:
+                    break
+                data.append(item)
 
-            if not isinstance(data, list):
+            if not data and not closed:
                 return raw_content
 
             excluded_categories = {"header", "footer", "page_footnote"}
@@ -625,6 +626,3 @@ def reset_service() -> None:
     """Reset the OCR service singleton so it reloads config on next access."""
     global _service_instance
     _service_instance = None
-
-
-OcrService = TyphoonOCRService
